@@ -1,0 +1,264 @@
+# 校园二手交易平台 - 基础设施 Docker Compose 配置
+# 适用于开发环境，单节点部署
+
+services:
+  # ==================== 数据存储层 ====================
+
+  # MySQL 8.0 - 主数据库
+  mysql:
+    image: mysql:8.0
+    container_name: fnusale-mysql
+    restart: unless-stopped
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-fnusale}
+      MYSQL_USER: ${MYSQL_USER:-fnusale}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-fnusale123456}
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+      - --max_connections=500
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root123456}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fnusale-network
+
+  # Redis 7.0 - 缓存/秒杀库存/IM会话
+  redis:
+    image: redis:7.0-alpine
+    container_name: fnusale-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis123456}
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis123456}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fnusale-network
+
+  # Elasticsearch 8.0 - 商品搜索
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.0.0
+    container_name: fnusale-elasticsearch
+    restart: unless-stopped
+    ports:
+      - "${ES_PORT:-9200}:9200"
+      - "9300:9300"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - fnusale-network
+
+  # MinIO - 对象存储（OSS替代）
+  minio:
+    image: minio/minio:latest
+    container_name: fnusale-minio
+    restart: unless-stopped
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-minio123456}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - fnusale-network
+
+  # ==================== 微服务治理层 ====================
+
+  # Nacos 2.3.0 - 注册/配置中心
+  nacos:
+    image: nacos/nacos-server:v2.3.0
+    container_name: fnusale-nacos
+    restart: unless-stopped
+    ports:
+      - "${NACOS_PORT:-8848}:8848"
+      - "9848:9848"
+      - "9849:9849"
+    environment:
+      MODE: standalone
+      SPRING_DATASOURCE_PLATFORM: mysql
+      MYSQL_SERVICE_HOST: mysql
+      MYSQL_SERVICE_PORT: 3306
+      MYSQL_SERVICE_DB_NAME: ${MYSQL_DATABASE:-fnusale}
+      MYSQL_SERVICE_USER: ${MYSQL_USER:-fnusale}
+      MYSQL_SERVICE_PASSWORD: ${MYSQL_PASSWORD:-fnusale123456}
+      NACOS_AUTH_ENABLE: "true"
+      NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN:-SecretKey012345678901234567890123456789012345678901234567890123456789}
+      NACOS_AUTH_IDENTITY_KEY: serverIdentity
+      NACOS_AUTH_IDENTITY_VALUE: security
+      JVM_XMS: 256m
+      JVM_XMX: 512m
+    volumes:
+      - nacos_data:/home/nacos/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8848/nacos/v1/console/health/readiness"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - fnusale-network
+
+  # Sentinel Dashboard 1.8.6 - 限流/熔断控制台
+  sentinel:
+    image: bladex/sentinel-dashboard:1.8.6
+    container_name: fnusale-sentinel
+    restart: unless-stopped
+    ports:
+      - "${SENTINEL_PORT:-8858}:8858"
+    environment:
+      - SENTINEL_DASHBOARD_SERVER=localhost:8858
+      - SENTINEL_SERVER_UNAME=${SENTINEL_USER:-sentinel}
+      - SENTINEL_SERVER_PASSWORD=${SENTINEL_PASSWORD:-sentinel123456}
+    networks:
+      - fnusale-network
+
+  # ==================== 消息队列 ====================
+
+  # RocketMQ NameServer
+  rocketmq-namesrv:
+    image: apache/rocketmq:5.0.0
+    container_name: fnusale-rocketmq-namesrv
+    restart: unless-stopped
+    ports:
+      - "${ROCKETMQ_NAMESRV_PORT:-9876}:9876"
+    environment:
+      JAVA_OPT_EXT: "-server -Xms128m -Xmx128m -Xmn64m"
+    command: sh mqnamesrv
+    volumes:
+      - rocketmq_namesrv_logs:/home/rocketmq/logs
+    networks:
+      - fnusale-network
+
+  # RocketMQ Broker
+  rocketmq-broker:
+    image: apache/rocketmq:5.0.0
+    container_name: fnusale-rocketmq-broker
+    restart: unless-stopped
+    ports:
+      - "${ROCKETMQ_BROKER_PORT:-10911}:10911"
+      - "10912:10912"
+    environment:
+      JAVA_OPT_EXT: "-server -Xms256m -Xmx256m -Xmn128m"
+    command: sh mqbroker -n rocketmq-namesrv:9876 -c /home/rocketmq/rocketmq-5.0.0/conf/broker.conf
+    volumes:
+      - rocketmq_broker_logs:/home/rocketmq/logs
+      - rocketmq_broker_store:/home/rocketmq/store
+    depends_on:
+      - rocketmq-namesrv
+    networks:
+      - fnusale-network
+
+  # RocketMQ Dashboard
+  rocketmq-dashboard:
+    image: apacherocketmq/rocketmq-dashboard:latest
+    container_name: fnusale-rocketmq-dashboard
+    restart: unless-stopped
+    ports:
+      - "${ROCKETMQ_DASHBOARD_PORT:-8180}:8080"
+    environment:
+      JAVA_OPTS: "-Drocketmq.namesrv.addr=rocketmq-namesrv:9876"
+    depends_on:
+      - rocketmq-namesrv
+    networks:
+      - fnusale-network
+
+  # ==================== 监控层 ====================
+
+  # Prometheus - 监控数据采集
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: fnusale-prometheus
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    networks:
+      - fnusale-network
+
+  # Grafana - 监控可视化
+  grafana:
+    image: grafana/grafana:latest
+    container_name: fnusale-grafana
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-grafana123456}
+      GF_INSTALL_PLUGINS: ""
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - fnusale-network
+
+# ==================== 网络配置 ====================
+networks:
+  fnusale-network:
+    driver: bridge
+    name: fnusale-network
+
+# ==================== 数据卷配置 ====================
+volumes:
+  mysql_data:
+    name: fnusale-mysql-data
+  redis_data:
+    name: fnusale-redis-data
+  es_data:
+    name: fnusale-es-data
+  minio_data:
+    name: fnusale-minio-data
+  nacos_data:
+    name: fnusale-nacos-data
+  rocketmq_namesrv_logs:
+    name: fnusale-rocketmq-namesrv-logs
+  rocketmq_broker_logs:
+    name: fnusale-rocketmq-broker-logs
+  rocketmq_broker_store:
+    name: fnusale-rocketmq-broker-store
+  prometheus_data:
+    name: fnusale-prometheus-data
+  grafana_data:
+    name: fnusale-grafana-data

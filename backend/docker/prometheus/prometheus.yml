@@ -1,0 +1,53 @@
+# Prometheus 配置文件
+# 校园二手交易平台 - 监控配置
+
+global:
+  scrape_interval: 15s      # 默认抓取间隔
+  evaluation_interval: 15s  # 规则评估间隔
+
+# 告警管理器配置（可选）
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['localhost:9093']
+
+# 抓取配置
+scrape_configs:
+  # Prometheus 自身监控
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          instance: 'prometheus'
+
+  # Spring Boot 应用监控（待微服务启动后启用）
+  # - job_name: 'spring-boot-apps'
+  #   metrics_path: '/actuator/prometheus'
+  #   static_configs:
+  #     - targets:
+  #       - 'user-service:8080'
+  #       - 'product-service:8081'
+  #       - 'order-service:8082'
+
+  # Nacos 监控
+  - job_name: 'nacos'
+    metrics_path: '/nacos/actuator/prometheus'
+    static_configs:
+      - targets: ['nacos:8848']
+        labels:
+          instance: 'nacos'
+
+  # Redis 监控（需要 redis_exporter）
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis-exporter:9121']
+
+  # MySQL 监控（需要 mysqld_exporter）
+  # - job_name: 'mysql'
+  #   static_configs:
+  #     - targets: ['mysql-exporter:9104']
+
+  # RocketMQ 监控（需要 rocketmq_exporter）
+  # - job_name: 'rocketmq'
+  #   static_configs:
+  #     - targets: ['rocketmq-exporter:5557']

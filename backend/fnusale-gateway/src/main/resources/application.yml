@@ -1,0 +1,101 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: fnusale-gateway
+  profiles:
+    active: dev
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_HOST:localhost}:${NACOS_PORT:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+      config:
+        server-addr: ${NACOS_HOST:localhost}:${NACOS_PORT:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        file-extension: yaml
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        # 用户服务
+        - id: fnusale-user
+          uri: lb://fnusale-user
+          predicates:
+            - Path=/api/user/**
+          filters:
+            - StripPrefix=1
+
+        # 商品服务
+        - id: fnusale-product
+          uri: lb://fnusale-product
+          predicates:
+            - Path=/api/product/**
+          filters:
+            - StripPrefix=1
+
+        # IM服务
+        - id: fnusale-im
+          uri: lb://fnusale-im
+          predicates:
+            - Path=/api/im/**
+          filters:
+            - StripPrefix=1
+
+        # AI导购服务
+        - id: fnusale-ai-guide
+          uri: lb://fnusale-ai-guide
+          predicates:
+            - Path=/api/ai-guide/**
+          filters:
+            - StripPrefix=1
+
+        # 营销服务
+        - id: fnusale-marketing
+          uri: lb://fnusale-marketing
+          predicates:
+            - Path=/api/marketing/**
+          filters:
+            - StripPrefix=1
+
+        # 交易服务
+        - id: fnusale-trade
+          uri: lb://fnusale-trade
+          predicates:
+            - Path=/api/trade/**
+          filters:
+            - StripPrefix=1
+
+        # 管理服务
+        - id: fnusale-admin
+          uri: lb://fnusale-admin
+          predicates:
+            - Path=/api/admin/**
+          filters:
+            - StripPrefix=1
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:redis123456}
+      database: 0
+
+# Knife4j 网关配置
+knife4j:
+  gateway:
+    enabled: true
+    strategy: discover
+    discover:
+      enabled: true
+      version: openapi3
+
+logging:
+  level:
+    com.fnusale: debug
+    org.springframework.cloud.gateway: debug
