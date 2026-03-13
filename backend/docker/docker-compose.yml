@@ -149,51 +149,24 @@ services:
 
   # ==================== 消息队列 ====================
 
-  # RocketMQ NameServer
-  rocketmq-namesrv:
-    image: apache/rocketmq:5.0.0
-    container_name: fnusale-rocketmq-namesrv
+  # RabbitMQ - 消息队列
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: fnusale-rabbitmq
     restart: unless-stopped
     ports:
-      - "${ROCKETMQ_NAMESRV_PORT:-9876}:9876"
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672"
     environment:
-      JAVA_OPT_EXT: "-server -Xms128m -Xmx128m -Xmn64m"
-    command: sh mqnamesrv
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-rabbitmq123456}
     volumes:
-      - rocketmq_namesrv_logs:/home/rocketmq/logs
-    networks:
-      - fnusale-network
-
-  # RocketMQ Broker
-  rocketmq-broker:
-    image: apache/rocketmq:5.0.0
-    container_name: fnusale-rocketmq-broker
-    restart: unless-stopped
-    ports:
-      - "${ROCKETMQ_BROKER_PORT:-10911}:10911"
-      - "10912:10912"
-    environment:
-      JAVA_OPT_EXT: "-server -Xms256m -Xmx256m -Xmn128m"
-    command: sh mqbroker -n rocketmq-namesrv:9876 -c /home/rocketmq/rocketmq-5.0.0/conf/broker.conf
-    volumes:
-      - rocketmq_broker_logs:/home/rocketmq/logs
-      - rocketmq_broker_store:/home/rocketmq/store
-    depends_on:
-      - rocketmq-namesrv
-    networks:
-      - fnusale-network
-
-  # RocketMQ Dashboard
-  rocketmq-dashboard:
-    image: apacherocketmq/rocketmq-dashboard:latest
-    container_name: fnusale-rocketmq-dashboard
-    restart: unless-stopped
-    ports:
-      - "${ROCKETMQ_DASHBOARD_PORT:-8180}:8080"
-    environment:
-      JAVA_OPTS: "-Drocketmq.namesrv.addr=rocketmq-namesrv:9876"
-    depends_on:
-      - rocketmq-namesrv
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
     networks:
       - fnusale-network
 
@@ -252,12 +225,8 @@ volumes:
     name: fnusale-minio-data
   nacos_data:
     name: fnusale-nacos-data
-  rocketmq_namesrv_logs:
-    name: fnusale-rocketmq-namesrv-logs
-  rocketmq_broker_logs:
-    name: fnusale-rocketmq-broker-logs
-  rocketmq_broker_store:
-    name: fnusale-rocketmq-broker-store
+  rabbitmq_data:
+    name: fnusale-rabbitmq-data
   prometheus_data:
     name: fnusale-prometheus-data
   grafana_data:
