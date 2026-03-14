@@ -1,9 +1,11 @@
 package com.fnusale.user.controller;
 
 import com.fnusale.common.common.Result;
+import com.fnusale.common.dto.user.UserAddressDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -33,7 +35,7 @@ public class UserAddressController {
 
     @Operation(summary = "新增地址", description = "添加新地址")
     @PostMapping
-    public Result<Void> add(@RequestBody Object dto) {
+    public Result<Void> add(@Valid @RequestBody UserAddressDTO dto) {
         // TODO: 实现新增地址逻辑
         return Result.success();
     }
@@ -42,7 +44,7 @@ public class UserAddressController {
     @PutMapping("/{id}")
     public Result<Void> update(
             @Parameter(description = "地址ID") @PathVariable Long id,
-            @RequestBody Object dto) {
+            @Valid @RequestBody UserAddressDTO dto) {
         // TODO: 实现更新地址逻辑
         return Result.success();
     }

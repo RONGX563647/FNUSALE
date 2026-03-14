@@ -18,6 +18,6 @@ public class UserUpdateDTO implements Serializable {
     @Schema(description = "头像URL")
     private String avatarUrl;
 
-    @Schema(description = "定位权限状态（ALLOW/DENY）")
+    @Schema(description = "定位权限状态（ALLOW-允许，DENY-拒绝）", allowableValues = {"ALLOW", "DENY"})
     private String locationPermission;
 }

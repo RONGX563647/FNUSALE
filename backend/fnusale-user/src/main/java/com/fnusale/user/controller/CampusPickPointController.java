@@ -2,9 +2,11 @@ package com.fnusale.user.controller;
 
 import com.fnusale.common.common.PageResult;
 import com.fnusale.common.common.Result;
+import com.fnusale.common.dto.user.CampusPickPointDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -44,7 +46,7 @@ public class CampusPickPointController {
 
     @Operation(summary = "新增自提点", description = "添加新的校园自提点（管理员）")
     @PostMapping
-    public Result<Void> add(@RequestBody Object dto) {
+    public Result<Void> add(@Valid @RequestBody CampusPickPointDTO dto) {
         // TODO: 实现新增自提点逻辑
         return Result.success();
     }
@@ -53,7 +55,7 @@ public class CampusPickPointController {
     @PutMapping("/{id}")
     public Result<Void> update(
             @Parameter(description = "自提点ID") @PathVariable Long id,
-            @RequestBody Object dto) {
+            @Valid @RequestBody CampusPickPointDTO dto) {
         // TODO: 实现更新自提点逻辑
         return Result.success();
     }

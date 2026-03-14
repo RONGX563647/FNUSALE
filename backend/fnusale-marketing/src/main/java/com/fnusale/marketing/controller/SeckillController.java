@@ -2,9 +2,11 @@ package com.fnusale.marketing.controller;
 
 import com.fnusale.common.common.PageResult;
 import com.fnusale.common.common.Result;
+import com.fnusale.common.dto.marketing.SeckillActivityDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -58,7 +60,7 @@ public class SeckillController {
 
     @Operation(summary = "创建秒杀活动", description = "创建新的秒杀活动（管理员）")
     @PostMapping
-    public Result<Void> createActivity(@RequestBody Object dto) {
+    public Result<Void> createActivity(@Valid @RequestBody SeckillActivityDTO dto) {
         // TODO: 实现创建秒杀活动逻辑
         return Result.success();
     }
@@ -67,7 +69,7 @@ public class SeckillController {
     @PutMapping("/{activityId}")
     public Result<Void> updateActivity(
             @Parameter(description = "活动ID") @PathVariable Long activityId,
-            @RequestBody Object dto) {
+            @Valid @RequestBody SeckillActivityDTO dto) {
         // TODO: 实现更新秒杀活动逻辑
         return Result.success();
     }

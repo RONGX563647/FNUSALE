@@ -2,9 +2,11 @@ package com.fnusale.marketing.controller;
 
 import com.fnusale.common.common.PageResult;
 import com.fnusale.common.common.Result;
+import com.fnusale.common.dto.marketing.CouponDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -59,7 +61,7 @@ public class CouponController {
 
     @Operation(summary = "新增优惠券", description = "创建新的优惠券（管理员）")
     @PostMapping
-    public Result<Void> createCoupon(@RequestBody Object dto) {
+    public Result<Void> createCoupon(@Valid @RequestBody CouponDTO dto) {
         // TODO: 实现新增优惠券逻辑
         return Result.success();
     }
@@ -68,7 +70,7 @@ public class CouponController {
     @PutMapping("/{couponId}")
     public Result<Void> updateCoupon(
             @Parameter(description = "优惠券ID") @PathVariable Long couponId,
-            @RequestBody Object dto) {
+            @Valid @RequestBody CouponDTO dto) {
         // TODO: 实现更新优惠券逻辑
         return Result.success();
     }

@@ -2,9 +2,11 @@ package com.fnusale.trade.controller;
 
 import com.fnusale.common.common.PageResult;
 import com.fnusale.common.common.Result;
+import com.fnusale.common.dto.trade.TradeDisputeDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -17,7 +19,7 @@ public class TradeDisputeController {
 
     @Operation(summary = "申请纠纷", description = "发起交易纠纷")
     @PostMapping
-    public Result<Void> createDispute(@RequestBody Object dto) {
+    public Result<Void> createDispute(@Valid @RequestBody TradeDisputeDTO dto) {
         // TODO: 实现申请纠纷逻辑
         return Result.success();
     }

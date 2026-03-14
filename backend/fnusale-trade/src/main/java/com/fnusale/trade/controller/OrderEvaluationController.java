@@ -1,9 +1,11 @@
 package com.fnusale.trade.controller;
 
 import com.fnusale.common.common.Result;
+import com.fnusale.common.dto.trade.OrderEvaluationDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -16,7 +18,7 @@ public class OrderEvaluationController {
 
     @Operation(summary = "提交评价", description = "买家对订单提交评价")
     @PostMapping
-    public Result<Void> submitEvaluation(@RequestBody Object dto) {
+    public Result<Void> submitEvaluation(@Valid @RequestBody OrderEvaluationDTO dto) {
         // TODO: 实现提交评价逻辑
         return Result.success();
     }

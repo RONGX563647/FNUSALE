@@ -1,10 +1,12 @@
 package com.fnusale.product.controller;
 
 import com.fnusale.common.common.Result;
+import com.fnusale.common.dto.product.ProductCategoryDTO;
 import com.fnusale.common.vo.product.ProductCategoryVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -49,7 +51,7 @@ public class ProductCategoryController {
 
     @Operation(summary = "新增品类", description = "添加新品类（管理员）")
     @PostMapping
-    public Result<Void> add(@RequestBody ProductCategoryVO dto) {
+    public Result<Void> add(@Valid @RequestBody ProductCategoryDTO dto) {
         // TODO: 实现新增品类逻辑
         return Result.success();
     }
@@ -58,7 +60,7 @@ public class ProductCategoryController {
     @PutMapping("/{id}")
     public Result<Void> update(
             @Parameter(description = "品类ID") @PathVariable Long id,
-            @RequestBody ProductCategoryVO dto) {
+            @Valid @RequestBody ProductCategoryDTO dto) {
         // TODO: 实现更新品类逻辑
         return Result.success();
     }

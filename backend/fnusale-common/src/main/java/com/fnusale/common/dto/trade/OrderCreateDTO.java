@@ -17,12 +17,12 @@ public class OrderCreateDTO implements Serializable {
     @NotNull(message = "商品ID不能为空")
     private Long productId;
 
-    @Schema(description = "优惠券ID")
+    @Schema(description = "优惠券ID（不使用优惠券时可不传）")
     private Long couponId;
 
     @Schema(description = "自提点ID")
     private Long pickPointId;
 
-    @Schema(description = "支付方式（WECHAT/ALIPAY/CAMPUS_CARD）")
+    @Schema(description = "支付方式（WECHAT-微信，ALIPAY-支付宝，CAMPUS_CARD-校园卡）", allowableValues = {"WECHAT", "ALIPAY", "CAMPUS_CARD"})
     private String payType;
 }

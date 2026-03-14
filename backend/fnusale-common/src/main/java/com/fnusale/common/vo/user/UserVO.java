@@ -28,16 +28,16 @@ public class UserVO implements Serializable {
     @Schema(description = "校园邮箱")
     private String campusEmail;
 
-    @Schema(description = "身份类型")
+    @Schema(description = "身份类型（STUDENT-学生，TEACHER-教职工）", allowableValues = {"STUDENT", "TEACHER"})
     private String identityType;
 
-    @Schema(description = "认证状态")
+    @Schema(description = "认证状态（UNAUTH-未认证，UNDER_REVIEW-审核中，AUTH_SUCCESS-认证成功，AUTH_FAILED-认证失败）", allowableValues = {"UNAUTH", "UNDER_REVIEW", "AUTH_SUCCESS", "AUTH_FAILED"})
     private String authStatus;
 
     @Schema(description = "信誉分")
     private Integer creditScore;
 
-    @Schema(description = "定位权限状态")
+    @Schema(description = "定位权限状态（ALLOW-允许，DENY-拒绝）", allowableValues = {"ALLOW", "DENY"})
     private String locationPermission;
 
     @Schema(description = "创建时间")

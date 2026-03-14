@@ -6,6 +6,8 @@ spring:
     name: fnusale-admin
   profiles:
     active: dev
+  config:
+    import: optional:nacos
   cloud:
     nacos:
       discovery:
@@ -14,7 +16,7 @@ spring:
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         username: ${NACOS_USERNAME:nacos}
         password: ${NACOS_PASSWORD:nacos}
-        enabled: ${NACOS_ENABLED:false}
+        enabled: ${NACOS_ENABLED:true}
       config:
         server-addr: ${NACOS_HOST:localhost}:${NACOS_PORT:8848}
         namespace: ${NACOS_NAMESPACE:}
@@ -22,7 +24,7 @@ spring:
         file-extension: yaml
         username: ${NACOS_USERNAME:nacos}
         password: ${NACOS_PASSWORD:nacos}
-        enabled: ${NACOS_ENABLED:false}
+        enabled: ${NACOS_ENABLED:true}
       import-check:
         enabled: false
   datasource:

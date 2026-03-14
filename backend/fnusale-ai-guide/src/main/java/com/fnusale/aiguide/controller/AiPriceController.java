@@ -1,9 +1,11 @@
 package com.fnusale.aiguide.controller;
 
 import com.fnusale.common.common.Result;
+import com.fnusale.common.dto.ai.AiPriceSuggestDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -27,7 +29,7 @@ public class AiPriceController {
 
     @Operation(summary = "获取商品定价建议", description = "根据商品信息获取智能定价建议")
     @PostMapping("/suggest")
-    public Result<Object> suggestPrice(@RequestBody Object dto) {
+    public Result<Object> suggestPrice(@Valid @RequestBody AiPriceSuggestDTO dto) {
         // TODO: 实现获取商品定价建议逻辑
         return Result.success();
     }

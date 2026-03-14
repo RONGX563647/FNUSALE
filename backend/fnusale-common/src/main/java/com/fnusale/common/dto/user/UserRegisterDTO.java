@@ -30,6 +30,6 @@ public class UserRegisterDTO implements Serializable {
     @Schema(description = "校园邮箱")
     private String campusEmail;
 
-    @Schema(description = "身份类型（STUDENT/TEACHER）")
+    @Schema(description = "身份类型（STUDENT-学生，TEACHER-教职工）", allowableValues = {"STUDENT", "TEACHER"})
     private String identityType;
 }

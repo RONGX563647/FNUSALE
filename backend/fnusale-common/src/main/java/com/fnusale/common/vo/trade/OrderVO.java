@@ -41,13 +41,13 @@ public class OrderVO implements Serializable {
     @Schema(description = "自提点名称")
     private String pickPointName;
 
-    @Schema(description = "支付方式")
+    @Schema(description = "支付方式（WECHAT-微信，ALIPAY-支付宝，CAMPUS_CARD-校园卡）", allowableValues = {"WECHAT", "ALIPAY", "CAMPUS_CARD"})
     private String payType;
 
-    @Schema(description = "支付状态")
+    @Schema(description = "支付状态（UNPAID-未支付，PAID-已支付，REFUNDED-已退款）", allowableValues = {"UNPAID", "PAID", "REFUNDED"})
     private String payStatus;
 
-    @Schema(description = "订单状态")
+    @Schema(description = "订单状态（UNPAID-待付款，WAIT_PICK-待自提，SUCCESS-已成交，CANCEL-已取消）", allowableValues = {"UNPAID", "WAIT_PICK", "SUCCESS", "CANCEL"})
     private String orderStatus;
 
     @Schema(description = "卖家ID")
