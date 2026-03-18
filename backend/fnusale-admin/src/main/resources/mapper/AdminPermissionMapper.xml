@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.fnusale.admin.mapper.AdminPermissionMapper">
+
+    <select id="selectPermissionCodesByAdminId" resultType="java.lang.String">
+        SELECT permission_code FROM t_admin_permission WHERE admin_id = #{adminId}
+    </select>
+
+</mapper>

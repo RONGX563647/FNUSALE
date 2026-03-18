@@ -3,7 +3,10 @@ package com.fnusale.common.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
@@ -11,6 +14,9 @@ import java.time.LocalDateTime;
  * 订单评价表
  */
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @TableName("t_order_evaluation")
 public class OrderEvaluation {
 
@@ -64,6 +70,21 @@ public class OrderEvaluation {
      * 回复时间
      */
     private LocalDateTime replyTime;
+
+    /**
+     * 追加评价内容
+     */
+    private String appendContent;
+
+    /**
+     * 追加评价图片地址
+     */
+    private String appendImageUrl;
+
+    /**
+     * 追加评价时间
+     */
+    private LocalDateTime appendTime;
 
     /**
      * 创建时间

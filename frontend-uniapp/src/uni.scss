@@ -1,0 +1,123 @@
+/* FNUSALE 现代蓝紫渐变主题配色方案 */
+
+/* ========== 蓝紫渐变主色调 ========== */
+$fnu-primary-light: #EEF2FF;
+$fnu-primary: #6366F1;
+$fnu-primary-dark: #4F46E5;
+$fnu-primary-darker: #4338CA;
+
+/* ========== 辅助色 ========== */
+$fnu-accent: #8B5CF6;
+$fnu-accent-light: #EDE9FE;
+$fnu-accent-hover: #7C3AED;
+
+/* ========== 中性色 ========== */
+$fnu-white: #FFFFFF;
+$fnu-gray-50: #F8FAFC;
+$fnu-gray-100: #F1F5F9;
+$fnu-gray-200: #E2E8F0;
+$fnu-gray-300: #CBD5E1;
+$fnu-gray-400: #94A3B8;
+$fnu-gray-500: #64748B;
+$fnu-gray-600: #475569;
+$fnu-gray-700: #334155;
+$fnu-gray-800: #1E293B;
+$fnu-gray-900: #0F172A;
+
+/* ========== 功能色 ========== */
+$fnu-success: #10B981;
+$fnu-success-light: #D1FAE5;
+$fnu-warning: #F59E0B;
+$fnu-warning-light: #FEF3C7;
+$fnu-error: #EF4444;
+$fnu-error-light: #FEE2E2;
+$fnu-info: #3B82F6;
+$fnu-info-light: #DBEAFE;
+
+/* ========== 文字颜色 ========== */
+$fnu-text-primary: #1E293B;
+$fnu-text-secondary: #64748B;
+$fnu-text-placeholder: #94A3B8;
+$fnu-text-disabled: #CBD5E1;
+$fnu-text-link: #6366F1;
+
+/* ========== 背景颜色 ========== */
+$fnu-bg-primary: #F8FAFC;
+$fnu-bg-secondary: #FFFFFF;
+$fnu-bg-tertiary: #F1F5F9;
+
+/* ========== 边框颜色 ========== */
+$fnu-border: #E2E8F0;
+$fnu-border-light: #F1F5F9;
+$fnu-border-focus: #6366F1;
+
+/* ========== 阴影 ========== */
+$fnu-shadow-sm: 0 1px 2px 0 rgba(99, 102, 241, 0.05);
+$fnu-shadow-md: 0 4px 6px -1px rgba(99, 102, 241, 0.1), 0 2px 4px -1px rgba(99, 102, 241, 0.06);
+$fnu-shadow-lg: 0 10px 15px -3px rgba(99, 102, 241, 0.1), 0 4px 6px -2px rgba(99, 102, 241, 0.05);
+$fnu-shadow-xl: 0 20px 25px -5px rgba(99, 102, 241, 0.1), 0 10px 10px -5px rgba(99, 102, 241, 0.04);
+
+/* ========== 圆角 ========== */
+$fnu-radius-sm: 4px;
+$fnu-radius-md: 8px;
+$fnu-radius-lg: 12px;
+$fnu-radius-xl: 16px;
+$fnu-radius-2xl: 24px;
+$fnu-radius-full: 9999px;
+
+/* ========== 间距 ========== */
+$fnu-spacing-xs: 8rpx;
+$fnu-spacing-sm: 16rpx;
+$fnu-spacing-md: 32rpx;
+$fnu-spacing-lg: 48rpx;
+$fnu-spacing-xl: 64rpx;
+$fnu-spacing-2xl: 96rpx;
+
+/* ========== 字号 ========== */
+$fnu-text-xs: 24rpx;
+$fnu-text-sm: 28rpx;
+$fnu-text-base: 32rpx;
+$fnu-text-lg: 36rpx;
+$fnu-text-xl: 40rpx;
+$fnu-text-2xl: 48rpx;
+$fnu-text-3xl: 60rpx;
+
+/* ========== 别名（兼容旧代码） ========== */
+$color-primary-light: $fnu-primary-light;
+$color-primary: $fnu-primary;
+$color-primary-dark: $fnu-primary-dark;
+$color-accent: $fnu-accent;
+$color-accent-light: $fnu-accent-light;
+$color-white: $fnu-white;
+$color-success: $fnu-success;
+$color-success-light: $fnu-success-light;
+$color-warning: $fnu-warning;
+$color-warning-light: $fnu-warning-light;
+$color-error: $fnu-error;
+$color-error-light: $fnu-error-light;
+$color-text-primary: $fnu-text-primary;
+$color-text-secondary: $fnu-text-secondary;
+$color-text-placeholder: $fnu-text-placeholder;
+$color-bg-primary: $fnu-bg-primary;
+$color-bg-secondary: $fnu-bg-secondary;
+$color-bg-tertiary: $fnu-bg-tertiary;
+$color-border: $fnu-border;
+$color-border-light: $fnu-border-light;
+$shadow-sm: $fnu-shadow-sm;
+$shadow-md: $fnu-shadow-md;
+$shadow-lg: $fnu-shadow-lg;
+$radius-sm: $fnu-radius-sm;
+$radius-md: $fnu-radius-md;
+$radius-lg: $fnu-radius-lg;
+$radius-xl: $fnu-radius-xl;
+$radius-full: $fnu-radius-full;
+$spacing-xs: $fnu-spacing-xs;
+$spacing-sm: $fnu-spacing-sm;
+$spacing-md: $fnu-spacing-md;
+$text-xs: $fnu-text-xs;
+$text-sm: $fnu-text-sm;
+$text-base: $fnu-text-base;
+$text-lg: $fnu-text-lg;
+$text-xl: $fnu-text-xl;
+$text-2xl: $fnu-text-2xl;
+$text-3xl: $fnu-text-3xl;

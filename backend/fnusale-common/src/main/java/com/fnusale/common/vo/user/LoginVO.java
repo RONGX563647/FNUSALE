@@ -1,7 +1,10 @@
 package com.fnusale.common.vo.user;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 
@@ -9,6 +12,9 @@ import java.io.Serializable;
  * 登录VO
  */
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Schema(description = "登录返回信息")
 public class LoginVO implements Serializable {
 
@@ -26,4 +32,7 @@ public class LoginVO implements Serializable {
 
     @Schema(description = "用户信息")
     private UserVO userInfo;
+
+    @Schema(description = "是否新用户（验证码登录自动注册时）")
+    private Boolean isNewUser;
 }

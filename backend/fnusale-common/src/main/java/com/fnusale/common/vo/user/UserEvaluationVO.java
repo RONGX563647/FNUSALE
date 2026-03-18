@@ -1,7 +1,10 @@
 package com.fnusale.common.vo.user;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
@@ -10,6 +13,9 @@ import java.time.LocalDateTime;
  * 用户评价VO
  */
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Schema(description = "用户评价")
 public class UserEvaluationVO implements Serializable {
 
@@ -48,6 +54,15 @@ public class UserEvaluationVO implements Serializable {
 
     @Schema(description = "卖家回复时间")
     private LocalDateTime replyTime;
+
+    @Schema(description = "追加评价内容")
+    private String appendContent;
+
+    @Schema(description = "追加评价图片")
+    private String appendImageUrl;
+
+    @Schema(description = "追加评价时间")
+    private LocalDateTime appendTime;
 
     @Schema(description = "创建时间")
     private LocalDateTime createTime;

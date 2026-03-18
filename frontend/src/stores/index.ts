@@ -1,2 +1,2 @@
-export { useUserStore } from './user'
+export { useAuthStore } from './auth'
 export { useAppStore } from './app'

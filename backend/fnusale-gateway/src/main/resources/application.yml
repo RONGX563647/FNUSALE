@@ -6,6 +6,8 @@ spring:
     name: fnusale-gateway
   profiles:
     active: dev
+  config:
+    import: "optional:nacos"
   cloud:
     nacos:
       discovery:
