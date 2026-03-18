@@ -1,7 +1,10 @@
 package com.fnusale.common.vo.marketing;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -11,6 +14,9 @@ import java.time.LocalDateTime;
  * 用户优惠券VO
  */
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Schema(description = "用户优惠券信息")
 public class UserCouponVO implements Serializable {
 

@@ -6,20 +6,21 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * 评价举报表
+ * 管理员实体
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("t_evaluation_report")
-public class EvaluationReport implements Serializable {
+@EqualsAndHashCode(callSuper = true)
+@TableName("t_admin")
+public class Admin extends BaseEntity {
 
     /**
      * 主键
@@ -28,42 +29,42 @@ public class EvaluationReport implements Serializable {
     private Long id;
 
     /**
-     * 评价ID
+     * 用户名
      */
-    private Long evaluationId;
+    private String username;
 
     /**
-     * 举报者ID
+     * 密码（BCrypt加密）
      */
-    private Long reporterId;
+    private String password;
 
     /**
-     * 举报原因
+     * 昵称
      */
-    private String reportReason;
+    private String nickname;
 
     /**
-     * 举报说明
+     * 头像地址
      */
-    private String reportDesc;
+    private String avatarUrl;
 
     /**
-     * 处理状态 (PENDING-待处理, APPROVED-已通过, REJECTED-已拒绝)
+     * 角色（SUPER_ADMIN/OPERATOR/SERVICE）
      */
-    private String status;
+    private String role;
 
     /**
-     * 处理结果
+     * 状态（0:禁用 1:启用）
      */
-    private String handleResult;
+    private Integer status;
 
     /**
-     * 处理时间
+     * 最后登录时间
      */
-    private LocalDateTime handleTime;
+    private LocalDateTime lastLoginTime;
 
     /**
-     * 创建时间
+     * 最后登录IP
      */
-    private LocalDateTime createTime;
+    private String lastLoginIp;
 }

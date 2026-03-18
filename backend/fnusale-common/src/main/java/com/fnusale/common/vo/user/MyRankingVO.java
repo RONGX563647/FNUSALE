@@ -1,7 +1,10 @@
 package com.fnusale.common.vo.user;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 
@@ -9,6 +12,9 @@ import java.io.Serializable;
  * 我的排名VO
  */
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Schema(description = "我的排名")
 public class MyRankingVO implements Serializable {
 
@@ -25,6 +31,9 @@ public class MyRankingVO implements Serializable {
     private RankingInfo rating;
 
     @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     @Schema(description = "排名信息")
     public static class RankingInfo implements Serializable {
 

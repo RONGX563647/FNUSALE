@@ -32,10 +32,19 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 空指针异常
+     */
+    @ExceptionHandler(NullPointerException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public Result<Void> handleNullPointerException(NullPointerException e) {
+        log.warn("空指针异常: {}, stack: {}", e.getMessage(), e.getStackTrace()[0]);
+        return Result.failed(ResultCode.UNAUTHORIZED.getCode(), "用户未登录");
+    }
+
+    /**
      * 参数校验异常 - @RequestBody
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
         String message = e.getBindingResult().getFieldErrors().stream()
                 .map(FieldError::getDefaultMessage)
@@ -48,7 +57,6 @@ public class GlobalExceptionHandler {
      * 参数校验异常 - @RequestParam
      */
     @ExceptionHandler(ConstraintViolationException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleConstraintViolationException(ConstraintViolationException e) {
         String message = e.getConstraintViolations().stream()
                 .map(ConstraintViolation::getMessage)
@@ -61,7 +69,6 @@ public class GlobalExceptionHandler {
      * 参数绑定异常
      */
     @ExceptionHandler(BindException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleBindException(BindException e) {
         String message = e.getBindingResult().getFieldErrors().stream()
                 .map(FieldError::getDefaultMessage)

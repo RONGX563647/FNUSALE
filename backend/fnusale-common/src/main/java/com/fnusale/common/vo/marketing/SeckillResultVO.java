@@ -1,7 +1,10 @@
 package com.fnusale.common.vo.marketing;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 
@@ -9,6 +12,9 @@ import java.io.Serializable;
  * 秒杀结果VO
  */
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Schema(description = "秒杀结果")
 public class SeckillResultVO implements Serializable {
 
@@ -22,17 +28,17 @@ public class SeckillResultVO implements Serializable {
     private String message;
 
     public static SeckillResultVO success(Long orderId) {
-        SeckillResultVO vo = new SeckillResultVO();
-        vo.setSuccess(true);
-        vo.setOrderId(orderId);
-        vo.setMessage("秒杀成功");
-        return vo;
+        return SeckillResultVO.builder()
+                .success(true)
+                .orderId(orderId)
+                .message("秒杀成功")
+                .build();
     }
 
     public static SeckillResultVO fail(String message) {
-        SeckillResultVO vo = new SeckillResultVO();
-        vo.setSuccess(false);
-        vo.setMessage(message);
-        return vo;
+        return SeckillResultVO.builder()
+                .success(false)
+                .message(message)
+                .build();
     }
 }

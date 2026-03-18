@@ -1,7 +1,10 @@
 package com.fnusale.common.vo.marketing;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -11,6 +14,9 @@ import java.time.LocalDateTime;
  * 秒杀活动VO
  */
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Schema(description = "秒杀活动信息")
 public class SeckillActivityVO implements Serializable {
 

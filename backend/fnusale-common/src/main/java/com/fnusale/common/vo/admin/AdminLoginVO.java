@@ -1,4 +1,4 @@
-package com.fnusale.common.vo.user;
+package com.fnusale.common.vo.admin;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
@@ -9,14 +9,14 @@ import lombok.NoArgsConstructor;
 import java.io.Serializable;
 
 /**
- * 登录VO
+ * 管理员登录响应VO
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Schema(description = "登录返回信息")
-public class LoginVO implements Serializable {
+@Schema(description = "管理员登录响应")
+public class AdminLoginVO implements Serializable {
 
     @Schema(description = "访问令牌")
     private String accessToken;
@@ -24,15 +24,9 @@ public class LoginVO implements Serializable {
     @Schema(description = "刷新令牌")
     private String refreshToken;
 
-    @Schema(description = "令牌类型")
-    private String tokenType;
-
     @Schema(description = "过期时间（秒）")
     private Long expiresIn;
 
-    @Schema(description = "用户信息")
-    private UserVO userInfo;
-
-    @Schema(description = "是否新用户（验证码登录自动注册时）")
-    private Boolean isNewUser;
+    @Schema(description = "管理员信息")
+    private AdminInfoVO adminInfo;
 }

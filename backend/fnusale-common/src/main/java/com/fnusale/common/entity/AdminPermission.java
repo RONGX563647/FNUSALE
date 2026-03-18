@@ -6,20 +6,19 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-import java.io.Serializable;
-import java.time.LocalDateTime;
-
 /**
- * 评价标签统计表
+ * 管理员权限实体
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("t_evaluation_tag_stat")
-public class EvaluationTagStat implements Serializable {
+@EqualsAndHashCode(callSuper = true)
+@TableName("t_admin_permission")
+public class AdminPermission extends BaseEntity {
 
     /**
      * 主键
@@ -28,22 +27,12 @@ public class EvaluationTagStat implements Serializable {
     private Long id;
 
     /**
-     * 用户ID
+     * 管理员ID
      */
-    private Long userId;
+    private Long adminId;
 
     /**
-     * 标签名称
+     * 权限代码
      */
-    private String tagName;
-
-    /**
-     * 出现次数
-     */
-    private Integer tagCount;
-
-    /**
-     * 更新时间
-     */
-    private LocalDateTime updateTime;
+    private String permissionCode;
 }
