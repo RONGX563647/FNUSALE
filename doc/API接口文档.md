@@ -67,9 +67,9 @@ Authorization: Bearer {accessToken}
 
 ## 一、用户模块 API
 
-### 1.1 用户注册
+### 1.1 手机号注册
 
-**接口地址**: `POST /user/register`
+**接口地址**: `POST /user/register/phone`
 
 **接口描述**: 使用手机号注册新用户账号
 
@@ -107,7 +107,7 @@ Authorization: Bearer {accessToken}
 
 **接口地址**: `POST /user/register/email`
 
-**接口描述**: 使用邮箱+验证码注册新用户账号
+**接口描述**: 使用邮箱注册新用户账号
 
 **请求参数**:
 ```json
@@ -139,23 +139,23 @@ Authorization: Bearer {accessToken}
 
 ---
 
-### 1.3 用户登录（手机号）
+### 1.3 用户登录
 
-**接口地址**: `POST /user/login/phone`
+**接口地址**: `POST /user/login`
 
-**接口描述**: 使用手机号和密码登录，返回JWT令牌
+**接口描述**: 使用手机号/邮箱和密码登录，返回JWT令牌。支持手机号或邮箱登录。
 
 **请求参数**:
 ```json
 {
-  "phone": "13800138000",
+  "account": "13800138000",
   "password": "password123"
 }
 ```
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| phone | String | 是 | 手机号 |
+| account | String | 是 | 手机号或邮箱地址 |
 | password | String | 是 | 密码 |
 
 **响应示例**:
@@ -182,50 +182,7 @@ Authorization: Bearer {accessToken}
 
 ---
 
-### 1.4 用户登录（邮箱）
-
-**接口地址**: `POST /user/login/email`
-
-**接口描述**: 使用邮箱和密码登录，返回JWT令牌
-
-**请求参数**:
-```json
-{
-  "email": "zhangsan@campus.edu.cn",
-  "password": "password123"
-}
-```
-
-| 参数名 | 类型 | 必填 | 说明 |
-|--------|------|------|------|
-| email | String | 是 | 邮箱地址 |
-| password | String | 是 | 密码 |
-
-**响应示例**:
-```json
-{
-  "code": 200,
-  "message": "登录成功",
-  "data": {
-    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "tokenType": "Bearer",
-    "expiresIn": 7200,
-    "userInfo": {
-      "id": 1,
-      "username": "张三",
-      "email": "zhan****@campus.edu.cn",
-      "identityType": "STUDENT",
-      "authStatus": "UNAUTH",
-      "creditScore": 100
-    }
-  }
-}
-```
-
----
-
-### 1.5 验证码登录
+### 1.4 验证码登录
 
 **接口地址**: `POST /user/login/captcha`
 
@@ -269,7 +226,7 @@ Authorization: Bearer {accessToken}
 
 ---
 
-### 1.6 发送验证码
+### 1.5 发送验证码
 
 **接口地址**: `POST /user/captcha/send`
 
@@ -308,7 +265,7 @@ Authorization: Bearer {accessToken}
 
 ---
 
-### 1.7 用户登出
+### 1.6 用户登出
 
 **接口地址**: `POST /user/logout`
 
@@ -800,7 +757,7 @@ Authorization: Bearer {accessToken}
 
 ### 1.21 获取我的积分信息
 
-**接口地址**: `GET /user/points`
+**接口地址**: `GET /user/sign/points`
 
 **接口描述**: 获取当前用户积分信息
 
@@ -823,7 +780,7 @@ Authorization: Bearer {accessToken}
 
 ### 1.22 获取积分变动记录
 
-**接口地址**: `GET /user/points/logs`
+**接口地址**: `GET /user/sign/points/logs`
 
 **接口描述**: 获取积分变动历史记录
 
@@ -962,7 +919,7 @@ Authorization: Bearer {accessToken}
 
 ### 1.26 获取用户评价列表
 
-**接口地址**: `GET /user/{userId}/evaluations`
+**接口地址**: `GET /user/evaluation/user/{userId}`
 
 **接口描述**: 获取用户收到的评价列表
 
@@ -1005,7 +962,7 @@ Authorization: Bearer {accessToken}
 
 ### 1.27 获取用户评价统计
 
-**接口地址**: `GET /user/{userId}/rating`
+**接口地址**: `GET /user/evaluation/rating/{userId}`
 
 **接口描述**: 获取用户评价统计数据
 
@@ -1035,7 +992,7 @@ Authorization: Bearer {accessToken}
 
 ### 1.28 获取用户评价标签统计
 
-**接口地址**: `GET /user/{userId}/tags`
+**接口地址**: `GET /user/evaluation/tags/{userId}`
 
 **接口描述**: 获取用户评价标签统计
 
@@ -1306,6 +1263,45 @@ Authorization: Bearer {accessToken}
   "data": {
     "rewardPoints": 60,
     "totalPoints": 216
+  }
+}
+```
+
+---
+
+### 1.37 获取排行榜历史
+
+**接口地址**: `GET /rank/history`
+
+**接口描述**: 获取历史排行记录
+
+**请求头**: 需要认证
+
+**请求参数**:
+| 参数名 | 类型 | 必填 | 默认值 | 说明 |
+|--------|------|------|--------|------|
+| rankType | String | 是 | - | 排行类型：ACTIVITY-活跃度，TRADE-交易，CREDIT-信誉，RATING-好评 |
+| pageNum | Integer | 否 | 1 | 页码 |
+| pageSize | Integer | 否 | 10 | 每页数量 |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "total": 30,
+    "list": [
+      {
+        "userId": 1,
+        "username": "张三",
+        "avatar": "https://oss.example.com/avatar.jpg",
+        "rankPosition": 3,
+        "rankType": "ACTIVITY",
+        "rankDate": "2024-01-15",
+        "score": 85
+      }
+    ]
   }
 }
 ```
