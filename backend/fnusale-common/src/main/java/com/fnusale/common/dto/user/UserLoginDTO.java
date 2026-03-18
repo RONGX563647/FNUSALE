@@ -13,11 +13,17 @@ import java.io.Serializable;
 @Schema(description = "用户登录请求")
 public class UserLoginDTO implements Serializable {
 
-    @Schema(description = "手机号", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "手机号不能为空")
+    @Schema(description = "手机号（loginType为PHONE时必填）")
     private String phone;
+
+    @Schema(description = "邮箱（loginType为EMAIL时必填）")
+    private String email;
 
     @Schema(description = "密码", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "密码不能为空")
     private String password;
+
+    @Schema(description = "登录类型（PHONE-手机号登录，EMAIL-邮箱登录）", requiredMode = Schema.RequiredMode.REQUIRED, allowableValues = {"PHONE", "EMAIL"})
+    @NotBlank(message = "登录类型不能为空")
+    private String loginType;
 }

@@ -17,6 +17,10 @@ public class UserAuthDTO implements Serializable {
     @NotBlank(message = "学号/工号不能为空")
     private String studentTeacherId;
 
+    @Schema(description = "身份类型（STUDENT-学生，TEACHER-教职工）", requiredMode = Schema.RequiredMode.REQUIRED, allowableValues = {"STUDENT", "TEACHER"})
+    @NotBlank(message = "身份类型不能为空")
+    private String identityType;
+
     @Schema(description = "校园卡/学生证审核图片地址（OSS）", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "认证图片不能为空")
     private String authImageUrl;
