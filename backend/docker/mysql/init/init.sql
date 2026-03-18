@@ -204,7 +204,7 @@ CREATE TABLE IF NOT EXISTS `t_user` (
     `birthday` date DEFAULT NULL COMMENT '生日',
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted` tinyint DEFAULT 0 COMMENT '是否删除: 0-未删除, 1-已删除',
+    `is_deleted` tinyint DEFAULT 0 COMMENT '是否删除: 0-未删除, 1-已删除',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_student_teacher_id` (`student_teacher_id`),
     UNIQUE KEY `uk_phone` (`phone`),
@@ -224,7 +224,7 @@ CREATE TABLE IF NOT EXISTS `sys_user` (
     `status` tinyint DEFAULT 0 COMMENT '状态: 0-正常, 1-禁用',
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted` tinyint DEFAULT 0 COMMENT '是否删除: 0-未删除, 1-已删除',
+    `is_deleted` tinyint DEFAULT 0 COMMENT '是否删除: 0-未删除, 1-已删除',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_username` (`username`),
     KEY `idx_create_time` (`create_time`)
@@ -240,7 +240,7 @@ CREATE TABLE IF NOT EXISTS `product_category` (
     `status` tinyint DEFAULT 1 COMMENT '状态: 0-禁用, 1-启用',
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted` tinyint DEFAULT 0 COMMENT '是否删除',
+    `is_deleted` tinyint DEFAULT 0 COMMENT '是否删除',
     PRIMARY KEY (`id`),
     KEY `idx_parent_id` (`parent_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商品分类表';
@@ -269,7 +269,7 @@ CREATE TABLE IF NOT EXISTS `product` (
     `seckill_end_time` datetime DEFAULT NULL COMMENT '秒杀结束时间',
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted` tinyint DEFAULT 0 COMMENT '是否删除',
+    `is_deleted` tinyint DEFAULT 0 COMMENT '是否删除',
     PRIMARY KEY (`id`),
     KEY `idx_user_id` (`user_id`),
     KEY `idx_category_id` (`category_id`),
@@ -298,7 +298,7 @@ CREATE TABLE IF NOT EXISTS `trade_order` (
     `cancel_reason` varchar(255) DEFAULT NULL COMMENT '取消原因',
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted` tinyint DEFAULT 0 COMMENT '是否删除',
+    `is_deleted` tinyint DEFAULT 0 COMMENT '是否删除',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_order_no` (`order_no`),
     KEY `idx_buyer_id` (`buyer_id`),
@@ -523,11 +523,31 @@ CREATE TABLE IF NOT EXISTS `t_order_evaluation` (
     `evaluation_image_url` varchar(500) DEFAULT NULL COMMENT '评价图片地址',
     `reply_content` varchar(500) DEFAULT NULL COMMENT '卖家回复内容',
     `reply_time` datetime DEFAULT NULL COMMENT '回复时间',
+    `append_content` varchar(500) DEFAULT NULL COMMENT '追加评价内容',
+    `append_image_url` varchar(500) DEFAULT NULL COMMENT '追加评价图片地址',
+    `append_time` datetime DEFAULT NULL COMMENT '追加评价时间',
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`),
     KEY `idx_order_id` (`order_id`),
     KEY `idx_evaluator_id` (`evaluator_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单评价表';
+
+-- 评价举报表
+CREATE TABLE IF NOT EXISTS `t_evaluation_report` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `evaluation_id` bigint NOT NULL COMMENT '评价ID',
+    `reporter_id` bigint NOT NULL COMMENT '举报者ID',
+    `report_reason` varchar(255) DEFAULT NULL COMMENT '举报原因',
+    `report_desc` varchar(500) DEFAULT NULL COMMENT '举报说明',
+    `status` varchar(20) DEFAULT 'PENDING' COMMENT '处理状态（PENDING-待处理, APPROVED-已通过, REJECTED-已拒绝）',
+    `handle_result` varchar(255) DEFAULT NULL COMMENT '处理结果',
+    `handle_time` datetime DEFAULT NULL COMMENT '处理时间',
+    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_evaluation_id` (`evaluation_id`),
+    KEY `idx_reporter_id` (`reporter_id`),
+    KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='评价举报表';
 
 -- 交易纠纷表
 CREATE TABLE IF NOT EXISTS `t_trade_dispute` (

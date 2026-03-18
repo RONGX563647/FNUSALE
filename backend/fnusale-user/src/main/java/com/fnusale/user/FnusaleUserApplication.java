@@ -9,7 +9,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 /**
  * 用户服务启动类
  */
-@SpringBootApplication(scanBasePackages = {"com.fnusale.user", "com.fnusale.common.config"})
+@SpringBootApplication(scanBasePackages = {"com.fnusale.user", "com.fnusale.common"})
 @EnableDiscoveryClient
 @EnableFeignClients
 @MapperScan("com.fnusale.user.mapper")
