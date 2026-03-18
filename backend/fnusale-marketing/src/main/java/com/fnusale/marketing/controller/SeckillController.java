@@ -23,7 +23,7 @@ import java.util.List;
  */
 @Tag(name = "秒杀活动管理", description = "秒杀活动、秒杀商品等接口")
 @RestController
-@RequestMapping("/seckill")
+@RequestMapping("/marketing/seckill")
 @RequiredArgsConstructor
 public class SeckillController {
 

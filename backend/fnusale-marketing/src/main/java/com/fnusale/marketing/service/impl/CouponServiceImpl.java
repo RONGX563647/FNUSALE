@@ -90,14 +90,7 @@ public class CouponServiceImpl implements CouponService {
         }
 
         // 创建用户优惠券记录
-        UserCoupon userCoupon = new UserCoupon();
-        userCoupon.setUserId(userId);
-        userCoupon.setCouponId(couponId);
-        userCoupon.setReceiveTime(now);
-        userCoupon.setExpireTime(coupon.getEndTime());
-        userCoupon.setCouponStatus(MarketingConstants.COUPON_STATUS_UNUSED);
-        userCoupon.setCreateTime(now);
-        userCouponMapper.insert(userCoupon);
+        userCouponMapper.insert(createUserCoupon(userId, couponId, coupon.getEndTime(), now));
 
         log.info("用户 {} 领取优惠券 {} 成功", userId, couponId);
     }
@@ -232,14 +225,7 @@ public class CouponServiceImpl implements CouponService {
             }
 
             // 创建用户优惠券记录
-            UserCoupon userCoupon = new UserCoupon();
-            userCoupon.setUserId(userId);
-            userCoupon.setCouponId(couponId);
-            userCoupon.setReceiveTime(now);
-            userCoupon.setExpireTime(coupon.getEndTime());
-            userCoupon.setCouponStatus(MarketingConstants.COUPON_STATUS_UNUSED);
-            userCoupon.setCreateTime(now);
-            userCouponMapper.insert(userCoupon);
+            userCouponMapper.insert(createUserCoupon(userId, couponId, coupon.getEndTime(), now));
             successCount++;
         }
 
@@ -323,25 +309,39 @@ public class CouponServiceImpl implements CouponService {
      * 转换为用户优惠券VO
      */
     private UserCouponVO convertToUserCouponVO(UserCoupon userCoupon) {
-        UserCouponVO vo = new UserCouponVO();
-        vo.setId(userCoupon.getId());
-        vo.setCouponId(userCoupon.getCouponId());
-        vo.setCouponStatus(userCoupon.getCouponStatus());
-        vo.setReceiveTime(userCoupon.getReceiveTime());
-        vo.setUseTime(userCoupon.getUseTime());
-        vo.setExpireTime(userCoupon.getExpireTime());
-        vo.setOrderId(userCoupon.getOrderId());
+        UserCouponVO.UserCouponVOBuilder builder = UserCouponVO.builder()
+                .id(userCoupon.getId())
+                .couponId(userCoupon.getCouponId())
+                .couponStatus(userCoupon.getCouponStatus())
+                .receiveTime(userCoupon.getReceiveTime())
+                .useTime(userCoupon.getUseTime())
+                .expireTime(userCoupon.getExpireTime())
+                .orderId(userCoupon.getOrderId());
 
         // 查询优惠券详情
         Coupon coupon = couponMapper.selectById(userCoupon.getCouponId());
         if (coupon != null) {
-            vo.setCouponName(coupon.getCouponName());
-            vo.setCouponType(coupon.getCouponType());
-            vo.setFullAmount(coupon.getFullAmount());
-            vo.setReduceAmount(coupon.getReduceAmount());
-            vo.setCategoryId(coupon.getCategoryId());
+            builder.couponName(coupon.getCouponName())
+                    .couponType(coupon.getCouponType())
+                    .fullAmount(coupon.getFullAmount())
+                    .reduceAmount(coupon.getReduceAmount())
+                    .categoryId(coupon.getCategoryId());
         }
 
-        return vo;
+        return builder.build();
+    }
+
+    /**
+     * 创建用户优惠券记录
+     */
+    private UserCoupon createUserCoupon(Long userId, Long couponId, LocalDateTime expireTime, LocalDateTime receiveTime) {
+        return UserCoupon.builder()
+                .userId(userId)
+                .couponId(couponId)
+                .receiveTime(receiveTime)
+                .expireTime(expireTime)
+                .couponStatus(MarketingConstants.COUPON_STATUS_UNUSED)
+                .createTime(receiveTime)
+                .build();
     }
 }

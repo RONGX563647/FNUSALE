@@ -235,10 +235,10 @@ public class SeckillServiceImpl implements SeckillService {
 
         List<TodaySeckillVO> result = new ArrayList<>();
         timeSlotMap.forEach((timeSlot, activityList) -> {
-            TodaySeckillVO vo = new TodaySeckillVO();
-            vo.setTimeSlot(timeSlot);
-            vo.setActivities(activityList);
-            result.add(vo);
+            result.add(TodaySeckillVO.builder()
+                    .timeSlot(timeSlot)
+                    .activities(activityList)
+                    .build());
         });
 
         result.sort((a, b) -> a.getTimeSlot().compareTo(b.getTimeSlot()));
@@ -270,13 +270,13 @@ public class SeckillServiceImpl implements SeckillService {
         }
 
         // 创建提醒记录
-        SeckillReminder reminder = new SeckillReminder();
-        reminder.setUserId(userId);
-        reminder.setActivityId(activityId);
-        // 提醒时间为活动开始前5分钟
-        reminder.setRemindTime(activity.getStartTime().minusMinutes(MarketingConstants.SECKILL_REMINDER_MINUTES));
-        reminder.setIsReminded(0);
-        reminder.setCreateTime(LocalDateTime.now());
+        SeckillReminder reminder = SeckillReminder.builder()
+                .userId(userId)
+                .activityId(activityId)
+                .remindTime(activity.getStartTime().minusMinutes(MarketingConstants.SECKILL_REMINDER_MINUTES))
+                .isReminded(0)
+                .createTime(LocalDateTime.now())
+                .build();
         reminderMapper.insert(reminder);
 
         log.info("用户 {} 设置秒杀提醒 {} 成功", userId, activityId);

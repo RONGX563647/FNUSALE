@@ -23,7 +23,7 @@ import java.util.List;
  */
 @Tag(name = "优惠券管理", description = "优惠券领取、使用、管理等接口")
 @RestController
-@RequestMapping("/coupon")
+@RequestMapping("/marketing/coupon")
 @RequiredArgsConstructor
 public class CouponController {
 
