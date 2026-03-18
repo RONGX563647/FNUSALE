@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.time.LocalDate;
+
 /**
  * 用户基础表
  */
@@ -74,4 +76,14 @@ public class User extends BaseEntity {
      * 信誉分（默认100）
      */
     private Integer creditScore;
+
+    /**
+     * 头像地址
+     */
+    private String avatarUrl;
+
+    /**
+     * 生日
+     */
+    private LocalDate birthday;
 }

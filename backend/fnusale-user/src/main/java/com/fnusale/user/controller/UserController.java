@@ -16,20 +16,28 @@ import org.springframework.web.bind.annotation.*;
 
 /**
  * 用户控制器
+ * 提供用户注册、登录、认证、信息管理等接口
  */
 @Tag(name = "用户管理", description = "用户注册、登录、认证、信息管理等接口")
 @RestController
 @RequestMapping("/user")
 public class UserController {
 
-    @Operation(summary = "用户注册", description = "使用手机号注册新用户")
-    @PostMapping("/register")
-    public Result<Void> register(@Valid @RequestBody UserRegisterDTO dto) {
+    @Operation(summary = "用户注册（手机号）", description = "使用手机号注册新用户")
+    @PostMapping("/register/phone")
+    public Result<Void> registerByPhone(@Valid @RequestBody UserRegisterDTO dto) {
         // TODO: 实现用户注册逻辑
         return Result.success();
     }
 
-    @Operation(summary = "用户登录", description = "手机号密码登录，返回JWT令牌")
+    @Operation(summary = "用户注册（邮箱）", description = "使用邮箱注册新用户")
+    @PostMapping("/register/email")
+    public Result<Void> registerByEmail(@Valid @RequestBody UserRegisterDTO dto) {
+        // TODO: 实现用户注册逻辑
+        return Result.success();
+    }
+
+    @Operation(summary = "用户登录", description = "手机号/邮箱密码登录，返回JWT令牌")
     @PostMapping("/login")
     public Result<LoginVO> login(@Valid @RequestBody UserLoginDTO dto) {
         // TODO: 实现用户登录逻辑
@@ -46,7 +54,7 @@ public class UserController {
     @Operation(summary = "刷新Token", description = "使用刷新令牌获取新的访问令牌")
     @PostMapping("/refresh-token")
     public Result<LoginVO> refreshToken(
-            @Parameter(description = "刷新令牌") @RequestParam String refreshToken) {
+            @Parameter(description = "刷新令牌", required = true) @RequestParam String refreshToken) {
         // TODO: 实现刷新Token逻辑
         return Result.success();
     }
@@ -58,7 +66,7 @@ public class UserController {
         return Result.success();
     }
 
-    @Operation(summary = "更新用户信息", description = "更新当前用户的基本信息")
+    @Operation(summary = "更新用户信息", description = "更新当前用户的基本信息（用户名、头像、生日等）")
     @PutMapping("/info")
     public Result<Void> updateUserInfo(@Valid @RequestBody UserUpdateDTO dto) {
         // TODO: 实现更新用户信息逻辑
@@ -68,13 +76,13 @@ public class UserController {
     @Operation(summary = "修改密码", description = "修改当前用户密码")
     @PutMapping("/password")
     public Result<Void> updatePassword(
-            @Parameter(description = "旧密码") @RequestParam String oldPassword,
-            @Parameter(description = "新密码") @RequestParam String newPassword) {
+            @Parameter(description = "旧密码", required = true) @RequestParam String oldPassword,
+            @Parameter(description = "新密码", required = true) @RequestParam String newPassword) {
         // TODO: 实现修改密码逻辑
         return Result.success();
     }
 
-    @Operation(summary = "校园身份认证", description = "提交校园卡/学生证进行身份认证")
+    @Operation(summary = "校园身份认证", description = "提交学号/工号和校园卡/学生证进行身份认证")
     @PostMapping("/auth")
     public Result<Void> submitAuth(@Valid @RequestBody UserAuthDTO dto) {
         // TODO: 实现提交认证逻辑
@@ -91,7 +99,7 @@ public class UserController {
     @Operation(summary = "获取用户详情", description = "根据用户ID获取用户公开信息")
     @GetMapping("/{userId}")
     public Result<UserVO> getUserById(
-            @Parameter(description = "用户ID") @PathVariable Long userId) {
+            @Parameter(description = "用户ID", required = true) @PathVariable Long userId) {
         // TODO: 实现获取用户详情逻辑
         return Result.success();
     }
@@ -99,7 +107,7 @@ public class UserController {
     @Operation(summary = "更新定位权限", description = "更新用户定位授权状态")
     @PutMapping("/location-permission")
     public Result<Void> updateLocationPermission(
-            @Parameter(description = "定位权限状态(ALLOW/DENY)") @RequestParam String permission) {
+            @Parameter(description = "定位权限状态(ALLOW/DENY)", required = true) @RequestParam String permission) {
         // TODO: 实现更新定位权限逻辑
         return Result.success();
     }
@@ -107,8 +115,8 @@ public class UserController {
     @Operation(summary = "校验定位是否在校园内", description = "校验用户当前定位是否在校园围栏内")
     @GetMapping("/location/verify")
     public Result<Boolean> verifyLocation(
-            @Parameter(description = "经度") @RequestParam String longitude,
-            @Parameter(description = "纬度") @RequestParam String latitude) {
+            @Parameter(description = "经度", required = true) @RequestParam String longitude,
+            @Parameter(description = "纬度", required = true) @RequestParam String latitude) {
         // TODO: 实现校验定位逻辑
         return Result.success();
     }
