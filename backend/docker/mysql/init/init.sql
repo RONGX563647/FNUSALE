@@ -231,91 +231,80 @@ CREATE TABLE IF NOT EXISTS `sys_user` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='管理员用户表';
 
 -- 商品分类表
-CREATE TABLE IF NOT EXISTS `product_category` (
+CREATE TABLE IF NOT EXISTS `t_product_category` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '分类ID',
-    `name` varchar(50) NOT NULL COMMENT '分类名称',
-    `parent_id` bigint DEFAULT 0 COMMENT '父分类ID',
-    `sort` int DEFAULT 0 COMMENT '排序',
-    `icon` varchar(255) DEFAULT NULL COMMENT '图标',
-    `status` tinyint DEFAULT 1 COMMENT '状态: 0-禁用, 1-启用',
+    `category_name` varchar(50) NOT NULL COMMENT '分类名称',
+    `parent_category_id` bigint DEFAULT 0 COMMENT '父分类ID',
+    `ai_mapping_value` varchar(100) DEFAULT NULL COMMENT 'AI分类映射值',
+    `enable_status` tinyint DEFAULT 1 COMMENT '状态: 0-禁用, 1-启用',
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `is_deleted` tinyint DEFAULT 0 COMMENT '是否删除',
     PRIMARY KEY (`id`),
-    KEY `idx_parent_id` (`parent_id`)
+    KEY `idx_parent_category_id` (`parent_category_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商品分类表';
 
 -- 商品表
-CREATE TABLE IF NOT EXISTS `product` (
+CREATE TABLE IF NOT EXISTS `t_product` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '商品ID',
     `user_id` bigint NOT NULL COMMENT '发布用户ID',
     `category_id` bigint NOT NULL COMMENT '分类ID',
-    `title` varchar(200) NOT NULL COMMENT '商品标题',
-    `description` text COMMENT '商品描述',
+    `product_name` varchar(200) NOT NULL COMMENT '商品名称',
+    `product_desc` text COMMENT '商品描述',
     `price` decimal(10,2) NOT NULL COMMENT '价格',
     `original_price` decimal(10,2) DEFAULT NULL COMMENT '原价',
-    `condition_level` tinyint DEFAULT 5 COMMENT '新旧程度: 1-10',
-    `images` json COMMENT '商品图片JSON数组',
-    `location` varchar(200) DEFAULT NULL COMMENT '交易地点',
-    `longitude` decimal(10,6) DEFAULT NULL COMMENT '经度',
-    `latitude` decimal(10,6) DEFAULT NULL COMMENT '纬度',
-    `view_count` int DEFAULT 0 COMMENT '浏览次数',
-    `favorite_count` int DEFAULT 0 COMMENT '收藏次数',
-    `status` tinyint DEFAULT 0 COMMENT '状态: 0-待审核, 1-上架, 2-已售, 3-下架, 4-违规',
+    `new_degree` varchar(20) DEFAULT 'NEW' COMMENT '新旧程度（NEW/90_NEW/80_NEW/70_NEW/OLD）',
+    `longitude` decimal(10,6) DEFAULT NULL COMMENT '发布时定位经度',
+    `latitude` decimal(10,6) DEFAULT NULL COMMENT '发布时定位纬度',
     `is_seckill` tinyint DEFAULT 0 COMMENT '是否秒杀商品',
-    `seckill_price` decimal(10,2) DEFAULT NULL COMMENT '秒杀价',
     `seckill_stock` int DEFAULT 0 COMMENT '秒杀库存',
-    `seckill_start_time` datetime DEFAULT NULL COMMENT '秒杀开始时间',
-    `seckill_end_time` datetime DEFAULT NULL COMMENT '秒杀结束时间',
+    `pick_point_id` bigint DEFAULT NULL COMMENT '自提点ID',
+    `product_status` varchar(20) DEFAULT 'DRAFT' COMMENT '状态（DRAFT/ON_SHELF/SOLD_OUT/OFF_SHELF/ILLEGAL）',
+    `illegal_reason` varchar(255) DEFAULT NULL COMMENT '违规原因',
+    `ai_category_result` varchar(100) DEFAULT NULL COMMENT 'AI分类结果',
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `is_deleted` tinyint DEFAULT 0 COMMENT '是否删除',
     PRIMARY KEY (`id`),
     KEY `idx_user_id` (`user_id`),
     KEY `idx_category_id` (`category_id`),
-    KEY `idx_status` (`status`),
+    KEY `idx_product_status` (`product_status`),
     KEY `idx_create_time` (`create_time`),
     KEY `idx_price` (`price`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商品表';
 
 -- 订单表
-CREATE TABLE IF NOT EXISTS `trade_order` (
+CREATE TABLE IF NOT EXISTS `t_order` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '订单ID',
     `order_no` varchar(64) NOT NULL COMMENT '订单编号',
-    `buyer_id` bigint NOT NULL COMMENT '买家ID',
-    `seller_id` bigint NOT NULL COMMENT '卖家ID',
+    `user_id` bigint NOT NULL COMMENT '买家ID',
     `product_id` bigint NOT NULL COMMENT '商品ID',
-    `product_title` varchar(200) NOT NULL COMMENT '商品标题',
-    `product_image` varchar(500) DEFAULT NULL COMMENT '商品图片',
-    `price` decimal(10,2) NOT NULL COMMENT '成交价格',
-    `pickup_location` varchar(200) DEFAULT NULL COMMENT '自提地点',
-    `coupon_id` bigint DEFAULT NULL COMMENT '优惠券ID',
-    `coupon_amount` decimal(10,2) DEFAULT 0 COMMENT '优惠券金额',
-    `actual_amount` decimal(10,2) NOT NULL COMMENT '实付金额',
-    `status` tinyint DEFAULT 0 COMMENT '状态: 0-待付款, 1-待自提, 2-已完成, 3-已取消, 4-已退款',
-    `pay_time` datetime DEFAULT NULL COMMENT '支付时间',
-    `complete_time` datetime DEFAULT NULL COMMENT '完成时间',
+    `product_price` decimal(10,2) NOT NULL COMMENT '商品原价',
+    `coupon_deduct_amount` decimal(10,2) DEFAULT 0 COMMENT '优惠券抵扣金额',
+    `actual_pay_amount` decimal(10,2) NOT NULL COMMENT '实付金额',
+    `pick_point_id` bigint DEFAULT NULL COMMENT '自提点ID',
+    `pay_type` varchar(20) DEFAULT NULL COMMENT '支付方式（WECHAT/ALIPAY/CAMPUS_CARD）',
+    `pay_status` varchar(20) DEFAULT 'UNPAID' COMMENT '支付状态（UNPAID/PAID/REFUNDED）',
+    `order_status` varchar(20) DEFAULT 'UNPAID' COMMENT '订单状态（UNPAID/WAIT_PICK/SUCCESS/CANCEL）',
     `cancel_reason` varchar(255) DEFAULT NULL COMMENT '取消原因',
+    `success_time` datetime DEFAULT NULL COMMENT '成交时间',
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `is_deleted` tinyint DEFAULT 0 COMMENT '是否删除',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_order_no` (`order_no`),
-    KEY `idx_buyer_id` (`buyer_id`),
-    KEY `idx_seller_id` (`seller_id`),
+    KEY `idx_user_id` (`user_id`),
     KEY `idx_product_id` (`product_id`),
-    KEY `idx_status` (`status`),
+    KEY `idx_order_status` (`order_status`),
     KEY `idx_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单表';
 
 -- 插入默认商品分类
-INSERT IGNORE INTO product_category (id, name, parent_id, sort, status) VALUES
-(1, '教材书籍', 0, 1, 1),
-(2, '电子产品', 0, 2, 1),
-(3, '生活用品', 0, 3, 1),
-(4, '体育器材', 0, 4, 1),
-(5, '服装鞋帽', 0, 5, 1),
-(6, '其他', 0, 99, 1);
+INSERT IGNORE INTO t_product_category (id, category_name, parent_category_id, enable_status) VALUES
+(1, '教材书籍', 0, 1),
+(2, '电子产品', 0, 1),
+(3, '生活用品', 0, 1),
+(4, '体育器材', 0, 1),
+(5, '服装鞋帽', 0, 1),
+(6, '其他', 0, 1);
 
 -- ==================== 用户相关表 ====================
 
@@ -644,8 +633,11 @@ CREATE TABLE IF NOT EXISTS `t_alert_record` (
 CREATE TABLE IF NOT EXISTS `t_operation_statistics` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
     `stat_date` date NOT NULL COMMENT '统计日期',
+    `new_user_count` int DEFAULT 0 COMMENT '当日新增用户数',
+    `active_user_count` int DEFAULT 0 COMMENT '当日活跃用户数',
     `product_publish_count` int DEFAULT 0 COMMENT '当日商品发布数',
     `order_success_count` int DEFAULT 0 COMMENT '当日成交订单数',
+    `order_success_amount` decimal(12,2) DEFAULT 0.00 COMMENT '当日成交金额',
     `seckill_participate_count` int DEFAULT 0 COMMENT '当日秒杀参与数',
     `ai_category_accuracy` decimal(5,2) DEFAULT NULL COMMENT 'AI分类准确率（%）',
     `coupon_use_count` int DEFAULT 0 COMMENT '当日优惠券使用数',
@@ -653,6 +645,21 @@ CREATE TABLE IF NOT EXISTS `t_operation_statistics` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_stat_date` (`stat_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='运营数据统计表';
+
+-- 系统配置历史记录表
+CREATE TABLE IF NOT EXISTS `t_system_config_history` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `config_key` varchar(100) NOT NULL COMMENT '配置键',
+    `old_value` text COMMENT '修改前值',
+    `new_value` text COMMENT '修改后值',
+    `admin_id` bigint DEFAULT NULL COMMENT '操作管理员ID',
+    `operate_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+    `operate_ip` varchar(50) DEFAULT NULL COMMENT '操作IP',
+    `remark` varchar(255) DEFAULT NULL COMMENT '备注',
+    PRIMARY KEY (`id`),
+    KEY `idx_config_key` (`config_key`),
+    KEY `idx_operate_time` (`operate_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统配置历史记录表';
 
 -- ==================== 签到相关表 ====================
 
