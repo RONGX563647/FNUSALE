@@ -1,0 +1,347 @@
+package com.fnusale.marketing.service.impl;
+
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fnusale.common.constant.MarketingConstants;
+import com.fnusale.common.dto.marketing.CouponDTO;
+import com.fnusale.common.entity.Coupon;
+import com.fnusale.common.entity.UserCoupon;
+import com.fnusale.common.exception.BusinessException;
+import com.fnusale.common.vo.marketing.CouponVO;
+import com.fnusale.common.vo.marketing.UserCouponVO;
+import com.fnusale.marketing.mapper.CouponMapper;
+import com.fnusale.marketing.mapper.UserCouponMapper;
+import com.fnusale.marketing.service.CouponService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * 优惠券服务实现
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class CouponServiceImpl implements CouponService {
+
+    private final CouponMapper couponMapper;
+    private final UserCouponMapper userCouponMapper;
+
+    @Override
+    public List<CouponVO> getAvailableCoupons(Long userId) {
+        LocalDateTime now = LocalDateTime.now();
+        List<Coupon> coupons = couponMapper.selectAvailableCoupons(now);
+
+        List<CouponVO> voList = new ArrayList<>();
+        for (Coupon coupon : coupons) {
+            CouponVO vo = convertToVO(coupon);
+            // 检查用户是否已领取
+            if (userId != null) {
+                int count = userCouponMapper.countByUserAndCoupon(userId, coupon.getId());
+                vo.setReceived(count > 0);
+            } else {
+                vo.setReceived(false);
+            }
+            voList.add(vo);
+        }
+        return voList;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void receiveCoupon(Long userId, Long couponId) {
+        // 检查优惠券是否存在
+        Coupon coupon = couponMapper.selectById(couponId);
+        if (coupon == null) {
+            throw new BusinessException(4001, "优惠券不存在");
+        }
+
+        // 检查优惠券是否启用
+        if (coupon.getEnableStatus() != 1) {
+            throw new BusinessException(4006, "优惠券已禁用");
+        }
+
+        // 检查优惠券是否在有效期内
+        LocalDateTime now = LocalDateTime.now();
+        if (now.isBefore(coupon.getStartTime())) {
+            throw new BusinessException(4003, "优惠券尚未开始");
+        }
+        if (now.isAfter(coupon.getEndTime())) {
+            throw new BusinessException(4003, "优惠券已过期");
+        }
+
+        // 检查是否已领取
+        int count = userCouponMapper.countByUserAndCoupon(userId, couponId);
+        if (count > 0) {
+            throw new BusinessException(4005, "您已领取过该优惠券");
+        }
+
+        // 增加已领取数量（乐观锁）
+        int rows = couponMapper.incrementReceivedCount(couponId);
+        if (rows == 0) {
+            throw new BusinessException(4002, "优惠券已领完");
+        }
+
+        // 创建用户优惠券记录
+        UserCoupon userCoupon = new UserCoupon();
+        userCoupon.setUserId(userId);
+        userCoupon.setCouponId(couponId);
+        userCoupon.setReceiveTime(now);
+        userCoupon.setExpireTime(coupon.getEndTime());
+        userCoupon.setCouponStatus(MarketingConstants.COUPON_STATUS_UNUSED);
+        userCoupon.setCreateTime(now);
+        userCouponMapper.insert(userCoupon);
+
+        log.info("用户 {} 领取优惠券 {} 成功", userId, couponId);
+    }
+
+    @Override
+    public List<UserCouponVO> getMyCoupons(Long userId, String status) {
+        List<UserCoupon> userCoupons = userCouponMapper.selectByUserId(userId, status);
+        List<UserCouponVO> voList = new ArrayList<>();
+        for (UserCoupon uc : userCoupons) {
+            UserCouponVO vo = convertToUserCouponVO(uc);
+            // 检查是否可用
+            vo.setUsable(MarketingConstants.COUPON_STATUS_UNUSED.equals(uc.getCouponStatus())
+                    && uc.getExpireTime().isAfter(LocalDateTime.now()));
+            voList.add(vo);
+        }
+        return voList;
+    }
+
+    @Override
+    public List<UserCouponVO> getUsableCoupons(Long userId, Long productId, BigDecimal price) {
+        List<UserCoupon> userCoupons = userCouponMapper.selectUsableCoupons(userId, productId, price);
+        List<UserCouponVO> voList = new ArrayList<>();
+        for (UserCoupon uc : userCoupons) {
+            voList.add(convertToUserCouponVO(uc));
+        }
+        return voList;
+    }
+
+    @Override
+    public CouponVO getCouponDetail(Long couponId) {
+        Coupon coupon = couponMapper.selectById(couponId);
+        if (coupon == null) {
+            throw new BusinessException(4001, "优惠券不存在");
+        }
+        return convertToVO(coupon);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void createCoupon(CouponDTO dto) {
+        // 校验优惠券类型
+        validateCouponDTO(dto);
+
+        Coupon coupon = new Coupon();
+        BeanUtils.copyProperties(dto, coupon);
+        coupon.setReceivedCount(0);
+        coupon.setUsedCount(0);
+        coupon.setCreateTime(LocalDateTime.now());
+
+        couponMapper.insert(coupon);
+        log.info("创建优惠券 {} 成功", coupon.getId());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateCoupon(Long couponId, CouponDTO dto) {
+        Coupon existing = couponMapper.selectById(couponId);
+        if (existing == null) {
+            throw new BusinessException(4001, "优惠券不存在");
+        }
+
+        // 校验优惠券类型
+        validateCouponDTO(dto);
+
+        BeanUtils.copyProperties(dto, existing);
+        existing.setId(couponId);
+        couponMapper.updateById(existing);
+        log.info("更新优惠券 {} 成功", couponId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteCoupon(Long couponId) {
+        Coupon coupon = couponMapper.selectById(couponId);
+        if (coupon == null) {
+            throw new BusinessException(4001, "优惠券不存在");
+        }
+
+        couponMapper.deleteById(couponId);
+        log.info("删除优惠券 {} 成功", couponId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateCouponStatus(Long couponId, Integer status) {
+        Coupon coupon = couponMapper.selectById(couponId);
+        if (coupon == null) {
+            throw new BusinessException(4001, "优惠券不存在");
+        }
+
+        coupon.setEnableStatus(status);
+        couponMapper.updateById(coupon);
+        log.info("更新优惠券 {} 状态为 {}", couponId, status);
+    }
+
+    @Override
+    public IPage<CouponVO> getCouponPage(String name, String type, Integer status, Integer pageNum, Integer pageSize) {
+        Page<Coupon> page = new Page<>(pageNum, pageSize);
+        IPage<Coupon> couponPage = couponMapper.selectCouponPage(page, name, type, status);
+
+        return couponPage.convert(this::convertToVO);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void grantCoupon(Long couponId, List<Long> userIds) {
+        Coupon coupon = couponMapper.selectById(couponId);
+        if (coupon == null) {
+            throw new BusinessException(4001, "优惠券不存在");
+        }
+
+        if (coupon.getEnableStatus() != 1) {
+            throw new BusinessException(4006, "优惠券已禁用");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        int successCount = 0;
+
+        for (Long userId : userIds) {
+            // 检查是否已领取
+            int count = userCouponMapper.countByUserAndCoupon(userId, couponId);
+            if (count > 0) {
+                log.warn("用户 {} 已领取优惠券 {}，跳过", userId, couponId);
+                continue;
+            }
+
+            // 检查库存
+            int rows = couponMapper.incrementReceivedCount(couponId);
+            if (rows == 0) {
+                log.warn("优惠券 {} 库存不足，停止发放", couponId);
+                break;
+            }
+
+            // 创建用户优惠券记录
+            UserCoupon userCoupon = new UserCoupon();
+            userCoupon.setUserId(userId);
+            userCoupon.setCouponId(couponId);
+            userCoupon.setReceiveTime(now);
+            userCoupon.setExpireTime(coupon.getEndTime());
+            userCoupon.setCouponStatus(MarketingConstants.COUPON_STATUS_UNUSED);
+            userCoupon.setCreateTime(now);
+            userCouponMapper.insert(userCoupon);
+            successCount++;
+        }
+
+        log.info("向 {} 位用户发放优惠券 {}，成功 {} 位", userIds.size(), couponId, successCount);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void useCoupon(Long userCouponId, Long orderId, Long userId) {
+        UserCoupon userCoupon = userCouponMapper.selectById(userCouponId);
+        if (userCoupon == null) {
+            throw new BusinessException(4001, "优惠券不存在");
+        }
+
+        // 检查是否属于当前用户
+        if (!userCoupon.getUserId().equals(userId)) {
+            throw new BusinessException(4001, "优惠券不存在");
+        }
+
+        // 检查优惠券状态
+        if (!MarketingConstants.COUPON_STATUS_UNUSED.equals(userCoupon.getCouponStatus())) {
+            throw new BusinessException(4004, "优惠券不可用");
+        }
+
+        // 检查是否过期
+        if (userCoupon.getExpireTime().isBefore(LocalDateTime.now())) {
+            throw new BusinessException(4003, "优惠券已过期");
+        }
+
+        // 更新优惠券状态
+        userCoupon.setCouponStatus(MarketingConstants.COUPON_STATUS_USED);
+        userCoupon.setUseTime(LocalDateTime.now());
+        userCoupon.setOrderId(orderId);
+        userCouponMapper.updateById(userCoupon);
+
+        // 增加已使用数量
+        couponMapper.incrementUsedCount(userCoupon.getCouponId());
+
+        log.info("用户 {} 使用优惠券 {} 成功，订单ID: {}", userId, userCouponId, orderId);
+    }
+
+    /**
+     * 校验优惠券DTO
+     */
+    private void validateCouponDTO(CouponDTO dto) {
+        // 满减券必须配置满减门槛
+        if ("FULL_REDUCE".equals(dto.getCouponType()) && dto.getFullAmount() == null) {
+            throw new BusinessException(400, "满减券必须配置满减门槛金额");
+        }
+
+        // 品类券必须关联品类
+        if ("CATEGORY".equals(dto.getCouponType()) && dto.getCategoryId() == null) {
+            throw new BusinessException(400, "品类券必须关联商品品类");
+        }
+
+        // 有效期不能超过90天
+        if (dto.getStartTime() != null && dto.getEndTime() != null) {
+            long days = java.time.Duration.between(dto.getStartTime(), dto.getEndTime()).toDays();
+            if (days > 90) {
+                throw new BusinessException(400, "有效期不能超过90天");
+            }
+        }
+
+        // 发放总数限制
+        if (dto.getTotalCount() != null && dto.getTotalCount() > 10000) {
+            throw new BusinessException(400, "发放总数最大不超过10000张");
+        }
+    }
+
+    /**
+     * 转换为VO
+     */
+    private CouponVO convertToVO(Coupon coupon) {
+        CouponVO vo = new CouponVO();
+        BeanUtils.copyProperties(coupon, vo);
+        vo.setRemainCount(coupon.getTotalCount() - coupon.getReceivedCount());
+        return vo;
+    }
+
+    /**
+     * 转换为用户优惠券VO
+     */
+    private UserCouponVO convertToUserCouponVO(UserCoupon userCoupon) {
+        UserCouponVO vo = new UserCouponVO();
+        vo.setId(userCoupon.getId());
+        vo.setCouponId(userCoupon.getCouponId());
+        vo.setCouponStatus(userCoupon.getCouponStatus());
+        vo.setReceiveTime(userCoupon.getReceiveTime());
+        vo.setUseTime(userCoupon.getUseTime());
+        vo.setExpireTime(userCoupon.getExpireTime());
+        vo.setOrderId(userCoupon.getOrderId());
+
+        // 查询优惠券详情
+        Coupon coupon = couponMapper.selectById(userCoupon.getCouponId());
+        if (coupon != null) {
+            vo.setCouponName(coupon.getCouponName());
+            vo.setCouponType(coupon.getCouponType());
+            vo.setFullAmount(coupon.getFullAmount());
+            vo.setReduceAmount(coupon.getReduceAmount());
+            vo.setCategoryId(coupon.getCategoryId());
+        }
+
+        return vo;
+    }
+}
