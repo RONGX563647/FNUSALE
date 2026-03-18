@@ -97,9 +97,9 @@ services:
 
   # ==================== 微服务治理层 ====================
 
-  # Nacos 2.3.0 - 注册/配置中心
+  # Nacos 2.3.0 - 注册/配置中心 (ARM兼容镜像)
   nacos:
-    image: nacos/nacos-server:v2.3.0
+    image: haoyu6/nacos-server-arm64:v2.2.3
     container_name: fnusale-nacos
     restart: unless-stopped
     ports:
