@@ -3,6 +3,7 @@ package com.fnusale.user.controller;
 import com.fnusale.common.common.PageResult;
 import com.fnusale.common.common.Result;
 import com.fnusale.common.dto.user.SignDTO;
+import com.fnusale.common.enums.ResultCode;
 import com.fnusale.common.vo.user.SignRecordVO;
 import com.fnusale.common.vo.user.SignResultVO;
 import com.fnusale.common.vo.user.SignStatusVO;
@@ -36,6 +37,9 @@ public class SignController {
     @PostMapping
     public Result<SignResultVO> sign() {
         Long userId = UserServiceImpl.getCurrentUserId();
+        if (userId == null) {
+            return Result.failed(ResultCode.UNAUTHORIZED.getCode(), "用户未登录");
+        }
         SignResultVO result = userSignService.sign(userId);
         return Result.success("签到成功", result);
     }
@@ -44,6 +48,9 @@ public class SignController {
     @GetMapping("/status")
     public Result<SignStatusVO> getSignStatus() {
         Long userId = UserServiceImpl.getCurrentUserId();
+        if (userId == null) {
+            return Result.failed(ResultCode.UNAUTHORIZED.getCode(), "用户未登录");
+        }
         SignStatusVO status = userSignService.getSignStatus(userId);
         return Result.success(status);
     }
@@ -52,6 +59,9 @@ public class SignController {
     @GetMapping("/statistics")
     public Result<SignStatusVO> getSignStatistics() {
         Long userId = UserServiceImpl.getCurrentUserId();
+        if (userId == null) {
+            return Result.failed(ResultCode.UNAUTHORIZED.getCode(), "用户未登录");
+        }
         SignStatusVO status = userSignService.getSignStatistics(userId);
         return Result.success(status);
     }
@@ -62,6 +72,9 @@ public class SignController {
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer pageNum,
             @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") Integer pageSize) {
         Long userId = UserServiceImpl.getCurrentUserId();
+        if (userId == null) {
+            return Result.failed(ResultCode.UNAUTHORIZED.getCode(), "用户未登录");
+        }
         PageResult<SignRecordVO> result = userSignService.getSignRecords(userId, pageNum, pageSize);
         return Result.success(result);
     }
@@ -71,6 +84,9 @@ public class SignController {
     public Result<List<String>> getSignCalendar(
             @Parameter(description = "月份，格式：yyyy-MM", required = true) @PathVariable String month) {
         Long userId = UserServiceImpl.getCurrentUserId();
+        if (userId == null) {
+            return Result.failed(ResultCode.UNAUTHORIZED.getCode(), "用户未登录");
+        }
         List<String> calendar = userSignService.getSignCalendar(userId, month);
         return Result.success(calendar);
     }
@@ -80,6 +96,9 @@ public class SignController {
     public Result<SignResultVO> repairSign(
             @Parameter(description = "补签请求", required = true) @Valid @RequestBody SignDTO dto) {
         Long userId = UserServiceImpl.getCurrentUserId();
+        if (userId == null) {
+            return Result.failed(ResultCode.UNAUTHORIZED.getCode(), "用户未登录");
+        }
         SignResultVO result = userSignService.repairSign(userId, dto);
         return Result.success("补签成功", result);
     }
@@ -88,6 +107,9 @@ public class SignController {
     @GetMapping("/points")
     public Result<UserPointsVO> getMyPoints() {
         Long userId = UserServiceImpl.getCurrentUserId();
+        if (userId == null) {
+            return Result.failed(ResultCode.UNAUTHORIZED.getCode(), "用户未登录");
+        }
         UserPointsVO points = userPointsService.getUserPoints(userId);
         return Result.success(points);
     }
@@ -98,6 +120,9 @@ public class SignController {
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer pageNum,
             @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") Integer pageSize) {
         Long userId = UserServiceImpl.getCurrentUserId();
+        if (userId == null) {
+            return Result.failed(ResultCode.UNAUTHORIZED.getCode(), "用户未登录");
+        }
         PageResult<Object> result = userPointsService.getPointsLogs(userId, pageNum, pageSize);
         return Result.success(result);
     }

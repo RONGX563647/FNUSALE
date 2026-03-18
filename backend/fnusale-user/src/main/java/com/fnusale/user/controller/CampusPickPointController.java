@@ -20,7 +20,7 @@ import java.util.List;
  */
 @Tag(name = "校园自提点管理", description = "校园自提点的增删改查接口，支持附近查询")
 @RestController
-@RequestMapping("/pick-point")
+@RequestMapping("/user/pick-point")
 @RequiredArgsConstructor
 public class CampusPickPointController {
 

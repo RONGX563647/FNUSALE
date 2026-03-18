@@ -123,22 +123,14 @@ public class RankingServiceImpl implements RankingService {
 
     @Override
     public MyRankingVO getMyRanking(Long userId) {
-        MyRankingVO vo = new MyRankingVO();
         LocalDate today = LocalDate.now();
 
-        // 活跃度排名
-        vo.setActivity(getUserRankInfo(userId, "ACTIVITY", today));
-
-        // 交易排名
-        vo.setTrade(getUserRankInfo(userId, "TRADE", today));
-
-        // 信誉排名
-        vo.setCredit(getUserRankInfo(userId, "CREDIT", today));
-
-        // 好评排名
-        vo.setRating(getUserRankInfo(userId, "RATING", today));
-
-        return vo;
+        return MyRankingVO.builder()
+                .activity(getUserRankInfo(userId, "ACTIVITY", today))
+                .trade(getUserRankInfo(userId, "TRADE", today))
+                .credit(getUserRankInfo(userId, "CREDIT", today))
+                .rating(getUserRankInfo(userId, "RATING", today))
+                .build();
     }
 
     @Override
@@ -146,12 +138,10 @@ public class RankingServiceImpl implements RankingService {
         List<RankingRecord> records = rankingRecordMapper.selectHistoryByTypeAndUser(rankType, userId);
 
         List<RankingUserVO> voList = records.stream()
-                .map(record -> {
-                    RankingUserVO vo = new RankingUserVO();
-                    vo.setRank(record.getRankPosition());
-                    vo.setScore(record.getScore());
-                    return vo;
-                })
+                .map(record -> RankingUserVO.builder()
+                        .rank(record.getRankPosition())
+                        .score(record.getScore())
+                        .build())
                 .collect(Collectors.toList());
 
         // 分页处理
@@ -241,18 +231,19 @@ public class RankingServiceImpl implements RankingService {
     private MyRankingVO.RankingInfo getUserRankInfo(Long userId, String rankType, LocalDate date) {
         RankingRecord record = rankingRecordMapper.selectByTypeDateAndUser(rankType, date, userId);
 
-        MyRankingVO.RankingInfo info = new MyRankingVO.RankingInfo();
         if (record != null) {
-            info.setRank(record.getRankPosition());
-            info.setScore(record.getScore() != null ? record.getScore().toString() : "0");
-            info.setInList(record.getRankPosition() <= RANKING_LIMIT);
+            return MyRankingVO.RankingInfo.builder()
+                    .rank(record.getRankPosition())
+                    .score(record.getScore() != null ? record.getScore().toString() : "0")
+                    .inList(record.getRankPosition() <= RANKING_LIMIT)
+                    .build();
         } else {
-            info.setRank(null);
-            info.setScore("0");
-            info.setInList(false);
+            return MyRankingVO.RankingInfo.builder()
+                    .rank(null)
+                    .score("0")
+                    .inList(false)
+                    .build();
         }
-
-        return info;
     }
 
     /**
@@ -265,28 +256,28 @@ public class RankingServiceImpl implements RankingService {
 
         return records.stream()
                 .map(record -> {
-                    RankingUserVO vo = new RankingUserVO();
-                    vo.setRank(record.getRankPosition());
-                    vo.setUserId(record.getUserId());
-                    vo.setScore(record.getScore());
+                    RankingUserVO.RankingUserVOBuilder builder = RankingUserVO.builder()
+                            .rank(record.getRankPosition())
+                            .userId(record.getUserId())
+                            .score(record.getScore());
 
                     // 查询用户信息
                     User user = userMapper.selectById(record.getUserId());
                     if (user != null) {
-                        vo.setUsername(user.getUsername());
-                        vo.setAvatarUrl(user.getAvatarUrl());
-                        vo.setCreditScore(user.getCreditScore());
+                        builder.username(user.getUsername())
+                                .avatarUrl(user.getAvatarUrl())
+                                .creditScore(user.getCreditScore());
                     }
 
                     // 查询评分信息
                     if ("RATING".equals(rankType) || "CREDIT".equals(rankType)) {
                         UserRating rating = userRatingMapper.selectByUserId(record.getUserId());
                         if (rating != null) {
-                            vo.setRating(rating.getOverallRating());
+                            builder.rating(rating.getOverallRating());
                         }
                     }
 
-                    return vo;
+                    return builder.build();
                 })
                 .collect(Collectors.toList());
     }
@@ -318,20 +309,20 @@ public class RankingServiceImpl implements RankingService {
             if (item.isEmpty()) continue;
             String[] parts = item.split(",");
             if (parts.length >= 3) {
-                RankingUserVO vo = new RankingUserVO();
-                vo.setUserId(Long.parseLong(parts[0]));
-                vo.setRank(Integer.parseInt(parts[1]));
-                vo.setScore(new BigDecimal(parts[2]));
+                RankingUserVO.RankingUserVOBuilder builder = RankingUserVO.builder()
+                        .userId(Long.parseLong(parts[0]))
+                        .rank(Integer.parseInt(parts[1]))
+                        .score(new BigDecimal(parts[2]));
 
                 // 补充用户信息
-                User user = userMapper.selectById(vo.getUserId());
+                User user = userMapper.selectById(Long.parseLong(parts[0]));
                 if (user != null) {
-                    vo.setUsername(user.getUsername());
-                    vo.setAvatarUrl(user.getAvatarUrl());
-                    vo.setCreditScore(user.getCreditScore());
+                    builder.username(user.getUsername())
+                            .avatarUrl(user.getAvatarUrl())
+                            .creditScore(user.getCreditScore());
                 }
 
-                result.add(vo);
+                result.add(builder.build());
             }
         }
         return result;
@@ -341,22 +332,22 @@ public class RankingServiceImpl implements RankingService {
      * 构建奖励VO
      */
     private RankingRewardVO buildRankingRewardVO(RankingRewardLog log) {
-        RankingRewardVO vo = new RankingRewardVO();
-        vo.setId(log.getId());
-        vo.setRankType(log.getRankType());
-        vo.setRankTypeName(getRankTypeName(log.getRankType()));
-        vo.setRankDate(log.getRankDate());
-        vo.setRankPosition(log.getRankPosition());
-        vo.setRewardPoints(log.getRewardPoints());
-        vo.setRewardCouponId(log.getRewardCouponId());
-        vo.setIsClaimed(log.getIsClaimed() == 1);
+        RankingRewardVO.RankingRewardVOBuilder builder = RankingRewardVO.builder()
+                .id(log.getId())
+                .rankType(log.getRankType())
+                .rankTypeName(getRankTypeName(log.getRankType()))
+                .rankDate(log.getRankDate())
+                .rankPosition(log.getRankPosition())
+                .rewardPoints(log.getRewardPoints())
+                .rewardCouponId(log.getRewardCouponId())
+                .isClaimed(log.getIsClaimed() == 1);
 
         // TODO: 查询优惠券名称
         if (log.getRewardCouponId() != null) {
-            vo.setRewardCouponName("优惠券");
+            builder.rewardCouponName("优惠券");
         }
 
-        return vo;
+        return builder.build();
     }
 
     /**

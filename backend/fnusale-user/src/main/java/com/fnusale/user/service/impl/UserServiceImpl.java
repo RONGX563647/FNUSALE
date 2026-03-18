@@ -41,7 +41,7 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private final UserPointsMapper userPointsMapper;
     private final StringRedisTemplate redisTemplate;
-    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final BCryptPasswordEncoder passwordEncoder;
 
     // 当前登录用户ID（通过ThreadLocal或请求上下文获取）
     private static final ThreadLocal<Long> currentUserId = new ThreadLocal<>();
@@ -67,6 +67,16 @@ public class UserServiceImpl implements UserService {
         }
         if (!dto.getPhone().matches("^1[3-9]\\d{9}$")) {
             throw new BusinessException("手机号格式不正确");
+        }
+        // 用户名长度校验
+        if (dto.getUsername() != null && (dto.getUsername().length() < UserConstants.USERNAME_MIN_LENGTH ||
+            dto.getUsername().length() > UserConstants.USERNAME_MAX_LENGTH)) {
+            throw new BusinessException("用户名长度应在" + UserConstants.USERNAME_MIN_LENGTH + "-" + UserConstants.USERNAME_MAX_LENGTH + "个字符之间");
+        }
+        // 密码长度校验
+        if (dto.getPassword() != null && (dto.getPassword().length() < UserConstants.PASSWORD_MIN_LENGTH ||
+            dto.getPassword().length() > UserConstants.PASSWORD_MAX_LENGTH)) {
+            throw new BusinessException("密码长度应在" + UserConstants.PASSWORD_MIN_LENGTH + "-" + UserConstants.PASSWORD_MAX_LENGTH + "位之间");
         }
 
         // 检查手机号是否已注册
@@ -102,6 +112,16 @@ public class UserServiceImpl implements UserService {
         }
         if (!dto.getEmail().matches("^[\\w-]+(\\.[\\w-]+)*@[\\w-]+(\\.[\\w-]+)+$")) {
             throw new BusinessException("邮箱格式不正确");
+        }
+        // 用户名长度校验
+        if (dto.getUsername() != null && (dto.getUsername().length() < UserConstants.USERNAME_MIN_LENGTH ||
+            dto.getUsername().length() > UserConstants.USERNAME_MAX_LENGTH)) {
+            throw new BusinessException("用户名长度应在" + UserConstants.USERNAME_MIN_LENGTH + "-" + UserConstants.USERNAME_MAX_LENGTH + "个字符之间");
+        }
+        // 密码长度校验
+        if (dto.getPassword() != null && (dto.getPassword().length() < UserConstants.PASSWORD_MIN_LENGTH ||
+            dto.getPassword().length() > UserConstants.PASSWORD_MAX_LENGTH)) {
+            throw new BusinessException("密码长度应在" + UserConstants.PASSWORD_MIN_LENGTH + "-" + UserConstants.PASSWORD_MAX_LENGTH + "位之间");
         }
 
         // 检查邮箱是否已注册

@@ -50,6 +50,11 @@ public class UserEvaluationServiceImpl implements UserEvaluationService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void submitEvaluation(Long userId, UserEvaluationDTO dto) {
+        // 验证评分范围
+        if (dto.getScore() == null || dto.getScore() < 1 || dto.getScore() > 5) {
+            throw new BusinessException("评分必须在1-5之间");
+        }
+
         // TODO: 需要调用交易服务验证订单状态
         // 1. 验证订单是否存在且属于当前用户
         // 2. 验证订单是否已完成
@@ -157,21 +162,35 @@ public class UserEvaluationServiceImpl implements UserEvaluationService {
 
     @Override
     public UserRatingVO getUserRating(Long userId) {
-        UserRating rating = userRatingMapper.selectByUserId(userId);
-        if (rating == null) {
-            // 初始化评分记录
-            rating = initUserRating(userId);
-        }
+        try {
+            UserRating rating = userRatingMapper.selectByUserId(userId);
+            if (rating == null) {
+                // 初始化评分记录
+                rating = initUserRating(userId);
+            }
 
-        UserRatingVO vo = new UserRatingVO();
-        vo.setOverallRating(rating.getOverallRating());
-        vo.setRatingLevel(rating.getRatingLevel());
-        vo.setTotalEvaluations(rating.getTotalEvaluations());
-        vo.setPositiveCount(rating.getPositiveCount());
-        vo.setNeutralCount(rating.getNeutralCount());
-        vo.setNegativeCount(rating.getNegativeCount());
-        vo.setPositiveRate(rating.getPositiveRate());
-        return vo;
+            return UserRatingVO.builder()
+                    .overallRating(rating.getOverallRating())
+                    .ratingLevel(rating.getRatingLevel())
+                    .totalEvaluations(rating.getTotalEvaluations())
+                    .positiveCount(rating.getPositiveCount())
+                    .neutralCount(rating.getNeutralCount())
+                    .negativeCount(rating.getNegativeCount())
+                    .positiveRate(rating.getPositiveRate())
+                    .build();
+        } catch (Exception e) {
+            log.warn("获取用户评分失败, userId: {}", userId, e);
+            // 返回默认评分
+            return UserRatingVO.builder()
+                    .overallRating(new BigDecimal("5.00"))
+                    .ratingLevel("EXCELLENT")
+                    .totalEvaluations(0)
+                    .positiveCount(0)
+                    .neutralCount(0)
+                    .negativeCount(0)
+                    .positiveRate(new BigDecimal("100.00"))
+                    .build();
+        }
     }
 
     @Override
@@ -207,13 +226,14 @@ public class UserEvaluationServiceImpl implements UserEvaluationService {
         }
 
         // 创建举报记录
-        EvaluationReport report = new EvaluationReport();
-        report.setEvaluationId(evaluationId);
-        report.setReporterId(userId);
-        report.setReportReason(dto.getReportReason());
-        report.setReportDesc(dto.getReportDesc());
-        report.setStatus("PENDING");
-        report.setCreateTime(LocalDateTime.now());
+        EvaluationReport report = EvaluationReport.builder()
+                .evaluationId(evaluationId)
+                .reporterId(userId)
+                .reportReason(dto.getReportReason())
+                .reportDesc(dto.getReportDesc())
+                .status("PENDING")
+                .createTime(LocalDateTime.now())
+                .build();
 
         evaluationReportMapper.insert(report);
 
@@ -225,19 +245,20 @@ public class UserEvaluationServiceImpl implements UserEvaluationService {
      * 初始化用户评分
      */
     private UserRating initUserRating(Long userId) {
-        UserRating rating = new UserRating();
-        rating.setUserId(userId);
-        rating.setOverallRating(new BigDecimal("5.00"));
-        rating.setRatingLevel("EXCELLENT");
-        rating.setTotalEvaluations(0);
-        rating.setPositiveCount(0);
-        rating.setNeutralCount(0);
-        rating.setNegativeCount(0);
-        rating.setPositiveRate(new BigDecimal("100.00"));
-        rating.setLast30dEvaluations(0);
-        rating.setLast30dRating(new BigDecimal("5.00"));
-        rating.setCreateTime(LocalDateTime.now());
-        rating.setUpdateTime(LocalDateTime.now());
+        UserRating rating = UserRating.builder()
+                .userId(userId)
+                .overallRating(new BigDecimal("5.00"))
+                .ratingLevel("EXCELLENT")
+                .totalEvaluations(0)
+                .positiveCount(0)
+                .neutralCount(0)
+                .negativeCount(0)
+                .positiveRate(new BigDecimal("100.00"))
+                .last30dEvaluations(0)
+                .last30dRating(new BigDecimal("5.00"))
+                .createTime(LocalDateTime.now())
+                .updateTime(LocalDateTime.now())
+                .build();
         userRatingMapper.insert(rating);
         return rating;
     }
@@ -322,11 +343,12 @@ public class UserEvaluationServiceImpl implements UserEvaluationService {
                 int updated = evaluationTagStatMapper.incrementTagCount(userId, trimmedTag);
                 if (updated == 0) {
                     // 标签不存在，创建新记录
-                    EvaluationTagStat stat = new EvaluationTagStat();
-                    stat.setUserId(userId);
-                    stat.setTagName(trimmedTag);
-                    stat.setTagCount(1);
-                    stat.setUpdateTime(LocalDateTime.now());
+                    EvaluationTagStat stat = EvaluationTagStat.builder()
+                            .userId(userId)
+                            .tagName(trimmedTag)
+                            .tagCount(1)
+                            .updateTime(LocalDateTime.now())
+                            .build();
                     evaluationTagStatMapper.insert(stat);
                 }
             }

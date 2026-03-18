@@ -2,12 +2,15 @@ package com.fnusale.user.controller;
 
 import com.fnusale.common.common.PageResult;
 import com.fnusale.common.common.Result;
+import com.fnusale.common.dto.user.CaptchaDTO;
+import com.fnusale.common.dto.user.CaptchaLoginDTO;
 import com.fnusale.common.dto.user.UserAuthDTO;
 import com.fnusale.common.dto.user.UserLoginDTO;
 import com.fnusale.common.dto.user.UserRegisterDTO;
 import com.fnusale.common.dto.user.UserUpdateDTO;
 import com.fnusale.common.vo.user.LoginVO;
 import com.fnusale.common.vo.user.UserVO;
+import com.fnusale.user.service.CaptchaService;
 import com.fnusale.user.service.UserService;
 import com.fnusale.user.service.impl.UserServiceImpl;
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,6 +31,7 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
+    private final CaptchaService captchaService;
 
     @Operation(summary = "用户注册（手机号）", description = "使用手机号注册新用户")
     @PostMapping("/register/phone")
@@ -48,6 +52,20 @@ public class UserController {
     public Result<LoginVO> login(@Valid @RequestBody UserLoginDTO dto) {
         LoginVO loginVO = userService.login(dto);
         return Result.success("登录成功", loginVO);
+    }
+
+    @Operation(summary = "验证码登录", description = "使用手机号/邮箱+验证码登录，用户不存在则自动注册")
+    @PostMapping("/login/captcha")
+    public Result<LoginVO> loginByCaptcha(@Valid @RequestBody CaptchaLoginDTO dto) {
+        LoginVO loginVO = captchaService.loginByCaptcha(dto);
+        return Result.success("登录成功", loginVO);
+    }
+
+    @Operation(summary = "发送验证码", description = "发送手机短信或邮箱验证码")
+    @PostMapping("/captcha/send")
+    public Result<Void> sendCaptcha(@Valid @RequestBody CaptchaDTO dto) {
+        captchaService.sendCaptcha(dto);
+        return Result.success("验证码发送成功", null);
     }
 
     @Operation(summary = "用户登出", description = "退出登录，清除Token")

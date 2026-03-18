@@ -20,7 +20,7 @@ import java.util.List;
  */
 @Tag(name = "用户地址管理", description = "用户地址的增删改查接口，支持自提点和自定义地址")
 @RestController
-@RequestMapping("/address")
+@RequestMapping("/user/address")
 @RequiredArgsConstructor
 public class UserAddressController {
 

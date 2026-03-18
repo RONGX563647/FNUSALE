@@ -47,4 +47,10 @@ public interface UserMapper extends BaseMapper<User> {
      */
     @Select("SELECT COUNT(*) FROM t_user WHERE student_teacher_id = #{studentTeacherId} AND is_deleted = 0")
     int countByStudentTeacherId(@Param("studentTeacherId") String studentTeacherId);
+
+    /**
+     * 根据手机号或邮箱查询用户
+     */
+    @Select("SELECT * FROM t_user WHERE (phone = #{account} OR campus_email = #{account}) AND is_deleted = 0")
+    User selectByPhoneOrEmail(@Param("account") String account);
 }
