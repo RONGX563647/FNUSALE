@@ -1,325 +1,60 @@
 import { http } from '@/utils/request'
-import type { Result, PageResult, PageParams } from '@/types/common'
-import type {
-  UserLoginDTO,
-  UserRegisterDTO,
-  UserUpdateDTO,
-  UserAuthDTO,
-  UserVO,
-  LoginVO,
-  UserAddressDTO,
-  UserAddressVO,
-  CampusPickPointDTO,
-  CampusPickPointVO,
-  SignDTO,
-  SignStatusVO,
-  SignResultVO,
-  SignRecordVO,
-  UserPointsVO,
-  UserEvaluationDTO,
-  EvaluationAppendDTO,
-  EvaluationReplyDTO,
-  EvaluationReportDTO,
-  UserEvaluationVO,
-  UserRatingVO,
-  RankingUserVO,
-  MyRankingVO,
-  RankingRewardVO
-} from '@/types/user'
+import type { Result, PageResult } from '@/types/api'
+import type { UserDetail, UserQueryParams, CreditAdjustResult } from '@/types/user'
 
-const BASE_URL = '/user'
-
+// 用户管理 API
 export const userApi = {
-  // 用户注册（手机号）
-  registerByPhone(data: Omit<UserRegisterDTO, 'registerType'>): Promise<Result<void>> {
-    return http.post(`${BASE_URL}/register/phone`, { ...data, registerType: 'PHONE' })
-  },
-
-  // 用户注册（邮箱）
-  registerByEmail(data: Omit<UserRegisterDTO, 'registerType'>): Promise<Result<void>> {
-    return http.post(`${BASE_URL}/register/email`, { ...data, registerType: 'EMAIL' })
-  },
-
-  // 用户登录（手机号）
-  loginByPhone(phone: string, password: string): Promise<Result<LoginVO>> {
-    return http.post(`${BASE_URL}/login`, { phone, password, loginType: 'PHONE' })
-  },
-
-  // 用户登录（邮箱）
-  loginByEmail(email: string, password: string): Promise<Result<LoginVO>> {
-    return http.post(`${BASE_URL}/login`, { email, password, loginType: 'EMAIL' })
-  },
-
-  // 用户登出
-  logout(): Promise<Result<void>> {
-    return http.post(`${BASE_URL}/logout`)
-  },
-
-  // 刷新Token
-  refreshToken(refreshToken: string): Promise<Result<LoginVO>> {
-    return http.post(`${BASE_URL}/refresh-token`, null, { params: { refreshToken } })
-  },
-
-  // 获取当前用户信息
-  getCurrentUserInfo(): Promise<Result<UserVO>> {
-    return http.get(`${BASE_URL}/info`)
-  },
-
-  // 更新用户信息
-  updateUserInfo(data: UserUpdateDTO): Promise<Result<void>> {
-    return http.put(`${BASE_URL}/info`, data)
-  },
-
-  // 修改密码
-  updatePassword(oldPassword: string, newPassword: string): Promise<Result<void>> {
-    return http.put(`${BASE_URL}/password`, null, { params: { oldPassword, newPassword } })
-  },
-
-  // 校园身份认证
-  submitAuth(data: UserAuthDTO): Promise<Result<void>> {
-    return http.post(`${BASE_URL}/auth`, data)
-  },
-
-  // 获取认证状态
-  getAuthStatus(): Promise<Result<UserVO>> {
-    return http.get(`${BASE_URL}/auth/status`)
+  // 获取用户列表
+  async getPage(params: UserQueryParams): Promise<Result<PageResult<UserDetail>>> {
+    const res = await http.get<PageResult<UserDetail>>('/admin/user/page', params)
+    return res.data
   },
 
   // 获取用户详情
-  getUserById(userId: number): Promise<Result<UserVO>> {
-    return http.get(`${BASE_URL}/${userId}`)
+  async getDetail(userId: number): Promise<Result<UserDetail>> {
+    const res = await http.get<UserDetail>(`/admin/user/${userId}`)
+    return res.data
   },
 
-  // 更新定位权限
-  updateLocationPermission(permission: 'ALLOW' | 'DENY'): Promise<Result<void>> {
-    return http.put(`${BASE_URL}/location-permission`, null, { params: { permission } })
+  // 获取待审核认证列表
+  async getPendingAuthList(pageNum = 1, pageSize = 10): Promise<Result<PageResult<UserDetail>>> {
+    const res = await http.get<PageResult<UserDetail>>('/admin/user/auth/pending', { pageNum, pageSize })
+    return res.data
   },
 
-  // 校验定位是否在校园内
-  verifyLocation(longitude: string, latitude: string): Promise<Result<boolean>> {
-    return http.get(`${BASE_URL}/location/verify`, { params: { longitude, latitude } })
+  // 审核通过认证
+  async authPass(userId: number): Promise<Result<void>> {
+    const res = await http.put<void>(`/admin/user/auth/${userId}/pass`)
+    return res.data
   },
 
-  // 获取我的发布列表
-  getMyProducts(params: PageParams): Promise<Result<PageResult<unknown>>> {
-    return http.get(`${BASE_URL}/my/products`, { params })
+  // 审核驳回认证
+  async authReject(userId: number, reason: string): Promise<Result<void>> {
+    const res = await http.put<void>(`/admin/user/auth/${userId}/reject`, undefined, { params: { reason } })
+    return res.data
   },
 
-  // 获取我的订单列表
-  getMyOrders(params: PageParams & { status?: string }): Promise<Result<PageResult<unknown>>> {
-    return http.get(`${BASE_URL}/my/orders`, { params })
+  // 封禁用户
+  async ban(userId: number, reason: string): Promise<Result<void>> {
+    const res = await http.put<void>(`/admin/user/${userId}/ban`, undefined, { params: { reason } })
+    return res.data
   },
 
-  // 获取我的收藏列表
-  getMyFavorites(params: PageParams): Promise<Result<PageResult<unknown>>> {
-    return http.get(`${BASE_URL}/my/favorites`, { params })
-  }
-}
-
-// 用户地址 API
-export const addressApi = {
-  // 获取我的地址列表
-  getList(): Promise<Result<UserAddressVO[]>> {
-    return http.get('/address/list')
+  // 解封用户
+  async unban(userId: number): Promise<Result<void>> {
+    const res = await http.put<void>(`/admin/user/${userId}/unban`)
+    return res.data
   },
 
-  // 获取地址详情
-  getById(id: number): Promise<Result<UserAddressVO>> {
-    return http.get(`/address/${id}`)
+  // 调整信誉分
+  async adjustCredit(userId: number, score: number, reason: string): Promise<Result<CreditAdjustResult>> {
+    const res = await http.put<CreditAdjustResult>(`/admin/user/${userId}/credit`, undefined, { params: { score, reason } })
+    return res.data
   },
 
-  // 新增地址
-  add(data: UserAddressDTO): Promise<Result<void>> {
-    return http.post('/address', data)
-  },
-
-  // 更新地址
-  update(id: number, data: UserAddressDTO): Promise<Result<void>> {
-    return http.put(`/address/${id}`, data)
-  },
-
-  // 删除地址
-  delete(id: number): Promise<Result<void>> {
-    return http.delete(`/address/${id}`)
-  },
-
-  // 设置默认地址
-  setDefault(id: number): Promise<Result<void>> {
-    return http.put(`/address/${id}/default`)
-  },
-
-  // 获取默认地址
-  getDefault(): Promise<Result<UserAddressVO>> {
-    return http.get('/address/default')
-  }
-}
-
-// 校园自提点 API
-export const pickPointApi = {
-  // 获取自提点列表（启用的）
-  getList(): Promise<Result<CampusPickPointVO[]>> {
-    return http.get('/pick-point/list')
-  },
-
-  // 获取附近自提点
-  getNearby(longitude: string, latitude: string, distance = 1000): Promise<Result<CampusPickPointVO[]>> {
-    return http.get('/pick-point/nearby', { params: { longitude, latitude, distance } })
-  },
-
-  // 获取自提点详情
-  getById(id: number): Promise<Result<CampusPickPointVO>> {
-    return http.get(`/pick-point/${id}`)
-  },
-
-  // 新增自提点（管理员）
-  add(data: CampusPickPointDTO): Promise<Result<void>> {
-    return http.post('/pick-point', data)
-  },
-
-  // 更新自提点（管理员）
-  update(id: number, data: CampusPickPointDTO): Promise<Result<void>> {
-    return http.put(`/pick-point/${id}`, data)
-  },
-
-  // 删除自提点（管理员）
-  delete(id: number): Promise<Result<void>> {
-    return http.delete(`/pick-point/${id}`)
-  },
-
-  // 启用/禁用自提点（管理员）
-  updateStatus(id: number, status: number): Promise<Result<void>> {
-    return http.put(`/pick-point/${id}/status`, null, { params: { status } })
-  },
-
-  // 分页查询自提点（管理员）
-  getPage(params: PageParams & { campusArea?: string; status?: number }): Promise<Result<PageResult<CampusPickPointVO>>> {
-    return http.get('/pick-point/page', { params })
-  }
-}
-
-// 签到 API
-export const signApi = {
-  // 每日签到
-  sign(): Promise<Result<SignResultVO>> {
-    return http.post('/user/sign')
-  },
-
-  // 查询签到状态
-  getStatus(): Promise<Result<SignStatusVO>> {
-    return http.get('/user/sign/status')
-  },
-
-  // 签到统计
-  getStatistics(): Promise<Result<SignStatusVO>> {
-    return http.get('/user/sign/statistics')
-  },
-
-  // 签到记录
-  getRecords(params: PageParams): Promise<Result<PageResult<SignRecordVO>>> {
-    return http.get('/user/sign/records', { params })
-  },
-
-  // 签到日历
-  getCalendar(month: string): Promise<Result<string[]>> {
-    return http.get(`/user/sign/calendar/${month}`)
-  },
-
-  // 补签
-  repair(data: SignDTO): Promise<Result<SignResultVO>> {
-    return http.post('/user/sign/repair', data)
-  }
-}
-
-// 用户积分 API
-export const pointsApi = {
-  // 获取我的积分
-  getMyPoints(): Promise<Result<UserPointsVO>> {
-    return http.get('/user/points')
-  }
-}
-
-// 用户评价 API
-export const evaluationApi = {
-  // 提交评价
-  submit(data: UserEvaluationDTO): Promise<Result<void>> {
-    return http.post('/user/evaluation', data)
-  },
-
-  // 追加评价
-  append(id: number, data: EvaluationAppendDTO): Promise<Result<void>> {
-    return http.post(`/user/evaluation/${id}/append`, data)
-  },
-
-  // 卖家回复
-  reply(id: number, data: EvaluationReplyDTO): Promise<Result<void>> {
-    return http.post(`/user/evaluation/${id}/reply`, data)
-  },
-
-  // 获取用户评价列表
-  getUserEvaluations(userId: number, params: PageParams): Promise<Result<PageResult<UserEvaluationVO>>> {
-    return http.get(`/user/evaluation/user/${userId}`, { params })
-  },
-
-  // 获取我的评价
-  getMyEvaluations(params: PageParams): Promise<Result<PageResult<UserEvaluationVO>>> {
-    return http.get('/user/evaluation/my', { params })
-  },
-
-  // 获取评价统计
-  getUserRating(userId: number): Promise<Result<UserRatingVO>> {
-    return http.get(`/user/evaluation/rating/${userId}`)
-  },
-
-  // 获取评价标签统计
-  getUserTags(userId: number): Promise<Result<{ tagName: string; tagCount: number }[]>> {
-    return http.get(`/user/evaluation/tags/${userId}`)
-  },
-
-  // 举报评价
-  report(id: number, data: EvaluationReportDTO): Promise<Result<void>> {
-    return http.post(`/user/evaluation/${id}/report`, data)
-  }
-}
-
-// 排行榜 API
-export const rankingApi = {
-  // 活跃度排行榜
-  getActivity(type: string = 'daily', date?: string): Promise<Result<RankingUserVO[]>> {
-    return http.get('/rank/activity', { params: { type, date } })
-  },
-
-  // 交易排行榜
-  getTrade(type: string = 'daily', date?: string): Promise<Result<RankingUserVO[]>> {
-    return http.get('/rank/trade', { params: { type, date } })
-  },
-
-  // 信誉排行榜
-  getCredit(): Promise<Result<RankingUserVO[]>> {
-    return http.get('/rank/credit')
-  },
-
-  // 好评排行榜
-  getRating(): Promise<Result<RankingUserVO[]>> {
-    return http.get('/rank/rating')
-  },
-
-  // 我的排名
-  getMyRanking(): Promise<Result<MyRankingVO>> {
-    return http.get('/rank/my')
-  },
-
-  // 排行榜历史
-  getHistory(rankType: string, params: PageParams): Promise<Result<PageResult<RankingUserVO>>> {
-    return http.get('/rank/history', { params: { rankType, ...params } })
-  },
-
-  // 领取奖励
-  claimReward(id: number): Promise<Result<void>> {
-    return http.post(`/rank/reward/${id}`)
-  },
-
-  // 我的奖励列表
-  getMyRewards(isClaimed?: boolean): Promise<Result<RankingRewardVO[]>> {
-    return http.get('/rank/rewards', { params: { isClaimed } })
+  // 获取用户认证记录
+  async getAuthRecords(userId: number): Promise<Result<UserDetail>> {
+    const res = await http.get<UserDetail>(`/admin/user/auth/${userId}/records`)
+    return res.data
   }
 }
