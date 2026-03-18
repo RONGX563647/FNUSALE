@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.fnusale.admin.mapper.UserMapper">
+
+    <select id="selectUserPage" resultType="com.fnusale.common.vo.admin.UserDetailVO">
+        SELECT
+            u.id as userId,
+            u.username,
+            CONCAT(LEFT(u.phone, 3), '****', RIGHT(u.phone, 4)) as phone,
+            CONCAT('****', RIGHT(u.student_teacher_id, 4)) as studentTeacherId,
+            u.campus_email as campusEmail,
+            u.identity_type as identityType,
+            u.auth_status as authStatus,
+            u.auth_result_remark as authResultRemark,
+            u.auth_image_url as authImageUrl,
+            u.credit_score as creditScore,
+            u.avatar_url as avatarUrl,
+            u.birthday,
+            u.create_time as registerTime
+        FROM t_user u
+        WHERE u.is_deleted = 0
+        <if test="username != null and username != ''">
+            AND u.username LIKE CONCAT('%', #{username}, '%')
+        </if>
+        <if test="authStatus != null and authStatus != ''">
+            AND u.auth_status = #{authStatus}
+        </if>
+        <if test="identityType != null and identityType != ''">
+            AND u.identity_type = #{identityType}
+        </if>
+        ORDER BY u.create_time DESC
+    </select>
+
+</mapper>

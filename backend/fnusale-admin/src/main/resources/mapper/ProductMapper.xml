@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.fnusale.admin.mapper.ProductMapper">
+
+    <select id="selectPendingProducts" resultType="com.fnusale.common.vo.admin.PendingProductVO">
+        SELECT
+            p.id as productId,
+            p.product_name as productName,
+            p.price,
+            pc.category_name as categoryName,
+            p.user_id as publisherId,
+            u.username as publisherName,
+            p.create_time as publishTime,
+            pi.image_url as mainImageUrl,
+            p.product_desc as productDesc
+        FROM t_product p
+        LEFT JOIN t_product_category pc ON p.category_id = pc.id
+        LEFT JOIN t_user u ON p.user_id = u.id
+        LEFT JOIN t_product_image pi ON p.id = pi.product_id AND pi.is_main = 1
+        WHERE p.product_status = 'DRAFT' AND p.is_deleted = 0
+        ORDER BY p.create_time ASC
+    </select>
+
+</mapper>
