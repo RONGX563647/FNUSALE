@@ -91,4 +91,4 @@ docker/mysql/data/
 docker/redis/data/
 docker/elasticsearch/data/
 docker/minio/data/
-docker/nacos/data/
+docker/nacos/data/backend/nacos/nacos/data/
