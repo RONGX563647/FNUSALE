@@ -66,6 +66,21 @@ public class OrderEvaluation {
     private LocalDateTime replyTime;
 
     /**
+     * 追加评价内容
+     */
+    private String appendContent;
+
+    /**
+     * 追加评价图片地址
+     */
+    private String appendImageUrl;
+
+    /**
+     * 追加评价时间
+     */
+    private LocalDateTime appendTime;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createTime;

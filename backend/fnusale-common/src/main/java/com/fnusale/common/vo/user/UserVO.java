@@ -1,7 +1,10 @@
 package com.fnusale.common.vo.user;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 import java.time.LocalDate;
@@ -11,6 +14,9 @@ import java.time.LocalDateTime;
  * 用户VO
  */
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Schema(description = "用户信息")
 public class UserVO implements Serializable {
 

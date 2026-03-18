@@ -1,7 +1,10 @@
 package com.fnusale.common.vo.user;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -11,6 +14,9 @@ import java.time.LocalDateTime;
  * 用户地址VO
  */
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Schema(description = "用户地址信息")
 public class UserAddressVO implements Serializable {
 
@@ -28,6 +34,12 @@ public class UserAddressVO implements Serializable {
 
     @Schema(description = "自提点名称（addressType为PICK_POINT时有值）")
     private String pickPointName;
+
+    @Schema(description = "所属校区（addressType为PICK_POINT时有值）")
+    private String campusArea;
+
+    @Schema(description = "详细地址（addressType为PICK_POINT时有值）")
+    private String detailAddress;
 
     @Schema(description = "自定义详细地址（addressType为CUSTOM时有值）")
     private String customAddress;

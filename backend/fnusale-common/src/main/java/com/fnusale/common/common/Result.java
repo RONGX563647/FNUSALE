@@ -1,7 +1,10 @@
 package com.fnusale.common.common;
 
 import com.fnusale.common.enums.ResultCode;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 
@@ -9,6 +12,9 @@ import java.io.Serializable;
  * 通用返回结果
  */
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class Result<T> implements Serializable {
 
     private int code;

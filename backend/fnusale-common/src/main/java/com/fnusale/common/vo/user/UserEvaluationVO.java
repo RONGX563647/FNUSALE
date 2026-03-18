@@ -49,6 +49,15 @@ public class UserEvaluationVO implements Serializable {
     @Schema(description = "卖家回复时间")
     private LocalDateTime replyTime;
 
+    @Schema(description = "追加评价内容")
+    private String appendContent;
+
+    @Schema(description = "追加评价图片")
+    private String appendImageUrl;
+
+    @Schema(description = "追加评价时间")
+    private LocalDateTime appendTime;
+
     @Schema(description = "创建时间")
     private LocalDateTime createTime;
 }
