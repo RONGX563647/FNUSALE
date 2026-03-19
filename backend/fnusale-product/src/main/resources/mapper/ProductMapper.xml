@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.fnusale.product.mapper.ProductMapper">
+
+    <resultMap id="ProductVOResultMap" type="com.fnusale.common.vo.product.ProductVO">
+        <id column="id" property="id"/>
+        <result column="product_name" property="productName"/>
+        <result column="category_id" property="categoryId"/>
+        <result column="category_name" property="categoryName"/>
+        <result column="new_degree" property="newDegree"/>
+        <result column="price" property="price"/>
+        <result column="original_price" property="originalPrice"/>
+        <result column="product_desc" property="productDesc"/>
+        <result column="is_seckill" property="isSeckill"/>
+        <result column="seckill_stock" property="seckillStock"/>
+        <result column="pick_point_id" property="pickPointId"/>
+        <result column="pick_point_name" property="pickPointName"/>
+        <result column="product_status" property="productStatus"/>
+        <result column="user_id" property="userId"/>
+        <result column="publisher_name" property="publisherName"/>
+        <result column="publisher_credit_score" property="publisherCreditScore"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <select id="selectProductPage" resultMap="ProductVOResultMap">
+        SELECT
+            p.id,
+            p.product_name,
+            p.category_id,
+            pc.category_name,
+            p.new_degree,
+            p.price,
+            p.original_price,
+            p.product_desc,
+            p.is_seckill,
+            p.seckill_stock,
+            p.pick_point_id,
+            cpp.pick_point_name,
+            p.product_status,
+            p.user_id,
+            u.username as publisher_name,
+            u.credit_score as publisher_credit_score,
+            p.create_time
+        FROM t_product p
+        LEFT JOIN t_product_category pc ON p.category_id = pc.id
+        LEFT JOIN t_campus_pick_point cpp ON p.pick_point_id = cpp.id
+        LEFT JOIN t_user u ON p.user_id = u.id
+        <where>
+            p.is_deleted = 0
+            <if test="keyword != null and keyword != ''">
+                AND (p.product_name LIKE CONCAT('%', #{keyword}, '%')
+                     OR p.product_desc LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="categoryId != null">
+                AND p.category_id = #{categoryId}
+            </if>
+            <if test="minPrice != null">
+                AND p.price &gt;= #{minPrice}
+            </if>
+            <if test="maxPrice != null">
+                AND p.price &lt;= #{maxPrice}
+            </if>
+            <if test="newDegree != null and newDegree != ''">
+                AND p.new_degree = #{newDegree}
+            </if>
+            <if test="isSeckill != null">
+                AND p.is_seckill = #{isSeckill}
+            </if>
+            <if test="productStatus != null and productStatus != ''">
+                AND p.product_status = #{productStatus}
+            </if>
+            <if test="userId != null">
+                AND p.user_id = #{userId}
+            </if>
+        </where>
+        <choose>
+            <when test="sortBy == 'price'">
+                ORDER BY p.price ${sortOrder}
+            </when>
+            <when test="sortBy == 'time' or sortBy == 'create_time'">
+                ORDER BY p.create_time ${sortOrder}
+            </when>
+            <otherwise>
+                ORDER BY p.create_time DESC
+            </otherwise>
+        </choose>
+    </select>
+
+    <select id="selectProductVOByIds" resultMap="ProductVOResultMap">
+        SELECT
+            p.id,
+            p.product_name,
+            p.category_id,
+            pc.category_name,
+            p.new_degree,
+            p.price,
+            p.original_price,
+            p.product_desc,
+            p.is_seckill,
+            p.seckill_stock,
+            p.pick_point_id,
+            cpp.pick_point_name,
+            p.product_status,
+            p.user_id,
+            u.username as publisher_name,
+            u.credit_score as publisher_credit_score,
+            p.create_time
+        FROM t_product p
+        LEFT JOIN t_product_category pc ON p.category_id = pc.id
+        LEFT JOIN t_campus_pick_point cpp ON p.pick_point_id = cpp.id
+        LEFT JOIN t_user u ON p.user_id = u.id
+        WHERE p.is_deleted = 0
+        AND p.id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+</mapper>
