@@ -1,6 +1,7 @@
 package com.fnusale.marketing.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.fnusale.common.annotation.RequireAdmin;
 import com.fnusale.common.common.PageResult;
 import com.fnusale.common.common.Result;
 import com.fnusale.common.dto.marketing.CouponDTO;
@@ -75,6 +76,7 @@ public class CouponController {
 
     @Operation(summary = "新增优惠券", description = "创建新的优惠券（管理员）")
     @PostMapping
+    @RequireAdmin("创建优惠券")
     public Result<Void> createCoupon(@Valid @RequestBody CouponDTO dto) {
         couponService.createCoupon(dto);
         return Result.success("创建成功", null);
@@ -82,6 +84,7 @@ public class CouponController {
 
     @Operation(summary = "更新优惠券", description = "更新优惠券信息（管理员）")
     @PutMapping("/{couponId}")
+    @RequireAdmin("更新优惠券")
     public Result<Void> updateCoupon(
             @Parameter(description = "优惠券ID") @PathVariable Long couponId,
             @Valid @RequestBody CouponDTO dto) {
@@ -91,6 +94,7 @@ public class CouponController {
 
     @Operation(summary = "删除优惠券", description = "删除优惠券（管理员）")
     @DeleteMapping("/{couponId}")
+    @RequireAdmin("删除优惠券")
     public Result<Void> deleteCoupon(
             @Parameter(description = "优惠券ID") @PathVariable Long couponId) {
         couponService.deleteCoupon(couponId);
@@ -99,6 +103,7 @@ public class CouponController {
 
     @Operation(summary = "启用/禁用优惠券", description = "切换优惠券启用状态（管理员）")
     @PutMapping("/{couponId}/status")
+    @RequireAdmin("切换优惠券状态")
     public Result<Void> updateCouponStatus(
             @Parameter(description = "优惠券ID") @PathVariable Long couponId,
             @Parameter(description = "启用状态(0-禁用,1-启用)") @RequestParam Integer status) {
@@ -108,6 +113,7 @@ public class CouponController {
 
     @Operation(summary = "分页查询优惠券", description = "分页查询优惠券列表（管理员）")
     @GetMapping("/page")
+    @RequireAdmin("分页查询优惠券")
     public Result<PageResult<CouponVO>> getCouponPage(
             @Parameter(description = "优惠券名称") @RequestParam(required = false) String name,
             @Parameter(description = "优惠券类型") @RequestParam(required = false) String type,
@@ -121,6 +127,7 @@ public class CouponController {
 
     @Operation(summary = "发放优惠券", description = "向指定用户发放优惠券（管理员）")
     @PostMapping("/{couponId}/grant")
+    @RequireAdmin("发放优惠券")
     public Result<Void> grantCoupon(
             @Parameter(description = "优惠券ID") @PathVariable Long couponId,
             @Parameter(description = "用户ID列表") @RequestBody List<Long> userIds) {

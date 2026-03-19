@@ -1,6 +1,8 @@
 package com.fnusale.marketing.controller;
 
+import com.alibaba.csp.sentinel.annotation.SentinelResource;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.fnusale.common.annotation.RequireAdmin;
 import com.fnusale.common.common.PageResult;
 import com.fnusale.common.common.Result;
 import com.fnusale.common.dto.marketing.SeckillActivityDTO;
@@ -8,6 +10,7 @@ import com.fnusale.common.util.UserContext;
 import com.fnusale.common.vo.marketing.SeckillActivityVO;
 import com.fnusale.common.vo.marketing.SeckillResultVO;
 import com.fnusale.common.vo.marketing.TodaySeckillVO;
+import com.fnusale.marketing.handler.SeckillBlockHandler;
 import com.fnusale.marketing.service.SeckillService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -31,6 +34,7 @@ public class SeckillController {
 
     @Operation(summary = "获取秒杀活动列表", description = "获取当前进行中和即将开始的秒杀活动")
     @GetMapping("/list")
+    @SentinelResource(value = "getSeckillList", blockHandler = "handleGetSeckillListBlock", blockHandlerClass = SeckillBlockHandler.class)
     public Result<List<SeckillActivityVO>> getSeckillList() {
         Long userId = UserContext.getCurrentUserId();
         List<SeckillActivityVO> activities = seckillService.getSeckillList(userId);
@@ -39,6 +43,7 @@ public class SeckillController {
 
     @Operation(summary = "获取秒杀活动详情", description = "获取秒杀活动详细信息")
     @GetMapping("/{activityId}")
+    @SentinelResource(value = "getSeckillDetail", blockHandler = "handleGetDetailBlock", blockHandlerClass = SeckillBlockHandler.class)
     public Result<SeckillActivityVO> getActivityDetail(
             @Parameter(description = "活动ID") @PathVariable Long activityId) {
         SeckillActivityVO activity = seckillService.getActivityDetail(activityId);
@@ -55,6 +60,7 @@ public class SeckillController {
 
     @Operation(summary = "参与秒杀", description = "参与秒杀抢购")
     @PostMapping("/{activityId}/join")
+    @SentinelResource(value = "joinSeckill", blockHandler = "handleJoinSeckillBlock", blockHandlerClass = SeckillBlockHandler.class)
     public Result<Long> joinSeckill(
             @Parameter(description = "活动ID") @PathVariable Long activityId) {
         Long userId = UserContext.getUserIdOrThrow();
@@ -73,6 +79,7 @@ public class SeckillController {
 
     @Operation(summary = "创建秒杀活动", description = "创建新的秒杀活动（管理员）")
     @PostMapping
+    @RequireAdmin("创建秒杀活动")
     public Result<Void> createActivity(@Valid @RequestBody SeckillActivityDTO dto) {
         seckillService.createActivity(dto);
         return Result.success("创建成功", null);
@@ -80,6 +87,7 @@ public class SeckillController {
 
     @Operation(summary = "更新秒杀活动", description = "更新秒杀活动信息（管理员）")
     @PutMapping("/{activityId}")
+    @RequireAdmin("更新秒杀活动")
     public Result<Void> updateActivity(
             @Parameter(description = "活动ID") @PathVariable Long activityId,
             @Valid @RequestBody SeckillActivityDTO dto) {
@@ -89,6 +97,7 @@ public class SeckillController {
 
     @Operation(summary = "删除秒杀活动", description = "删除秒杀活动（管理员）")
     @DeleteMapping("/{activityId}")
+    @RequireAdmin("删除秒杀活动")
     public Result<Void> deleteActivity(
             @Parameter(description = "活动ID") @PathVariable Long activityId) {
         seckillService.deleteActivity(activityId);
@@ -97,6 +106,7 @@ public class SeckillController {
 
     @Operation(summary = "分页查询秒杀活动", description = "分页查询秒杀活动列表（管理员）")
     @GetMapping("/page")
+    @RequireAdmin("分页查询秒杀活动")
     public Result<PageResult<SeckillActivityVO>> getActivityPage(
             @Parameter(description = "活动状态") @RequestParam(required = false) String status,
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer pageNum,
@@ -108,6 +118,7 @@ public class SeckillController {
 
     @Operation(summary = "获取今日秒杀", description = "获取今日的秒杀活动时间表")
     @GetMapping("/today")
+    @SentinelResource(value = "getTodaySeckills", blockHandler = "handleGetSeckillListBlock", blockHandlerClass = SeckillBlockHandler.class)
     public Result<List<TodaySeckillVO>> getTodaySeckills() {
         Long userId = UserContext.getCurrentUserId();
         List<TodaySeckillVO> activities = seckillService.getTodaySeckills(userId);

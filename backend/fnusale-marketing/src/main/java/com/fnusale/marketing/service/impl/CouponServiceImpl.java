@@ -7,6 +7,7 @@ import com.fnusale.common.dto.marketing.CouponDTO;
 import com.fnusale.common.entity.Coupon;
 import com.fnusale.common.entity.UserCoupon;
 import com.fnusale.common.event.CouponGrantEvent;
+import com.fnusale.common.event.CouponReceiveEvent;
 import com.fnusale.common.exception.BusinessException;
 import com.fnusale.common.vo.marketing.CouponVO;
 import com.fnusale.common.vo.marketing.UserCouponVO;
@@ -17,6 +18,7 @@ import com.fnusale.marketing.service.MarketingEventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 优惠券服务实现
@@ -37,6 +40,13 @@ public class CouponServiceImpl implements CouponService {
     private final CouponMapper couponMapper;
     private final UserCouponMapper userCouponMapper;
     private final MarketingEventPublisher eventPublisher;
+    private final StringRedisTemplate redisTemplate;
+
+    /**
+     * 优惠券库存 Redis Key 前缀
+     */
+    private static final String COUPON_STOCK_KEY_PREFIX = "coupon:stock:";
+    private static final String COUPON_RECEIVED_KEY_PREFIX = "coupon:received:";
 
     @Override
     public List<CouponVO> getAvailableCoupons(Long userId) {
@@ -59,7 +69,6 @@ public class CouponServiceImpl implements CouponService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void receiveCoupon(Long userId, Long couponId) {
         // 检查优惠券是否存在
         Coupon coupon = couponMapper.selectById(couponId);
@@ -81,22 +90,62 @@ public class CouponServiceImpl implements CouponService {
             throw new BusinessException(4003, "优惠券已过期");
         }
 
-        // 检查是否已领取
-        int count = userCouponMapper.countByUserAndCoupon(userId, couponId);
-        if (count > 0) {
+        // 检查是否已领取（先查 Redis，再查 DB）
+        String receivedKey = COUPON_RECEIVED_KEY_PREFIX + couponId;
+        Boolean hasReceived = redisTemplate.opsForSet().isMember(receivedKey, userId.toString());
+        if (Boolean.TRUE.equals(hasReceived)) {
             throw new BusinessException(4005, "您已领取过该优惠券");
         }
 
-        // 增加已领取数量（乐观锁）
-        int rows = couponMapper.incrementReceivedCount(couponId);
-        if (rows == 0) {
+        // 双重检查：查 DB 确保未领取
+        int count = userCouponMapper.countByUserAndCoupon(userId, couponId);
+        if (count > 0) {
+            // 同步到 Redis
+            redisTemplate.opsForSet().add(receivedKey, userId.toString());
+            throw new BusinessException(4005, "您已领取过该优惠券");
+        }
+
+        // ========== Redis 预扣库存 ==========
+        String stockKey = COUPON_STOCK_KEY_PREFIX + couponId;
+        String stockStr = redisTemplate.opsForValue().get(stockKey);
+
+        // 如果 Redis 中没有库存缓存，从 DB 加载
+        if (stockStr == null) {
+            int remainCount = coupon.getTotalCount() - coupon.getReceivedCount();
+            redisTemplate.opsForValue().set(stockKey, String.valueOf(remainCount));
+            stockStr = String.valueOf(remainCount);
+        }
+
+        // 检查库存
+        long remainStock = Long.parseLong(stockStr);
+        if (remainStock <= 0) {
             throw new BusinessException(4002, "优惠券已领完");
         }
 
-        // 创建用户优惠券记录
-        userCouponMapper.insert(createUserCoupon(userId, couponId, coupon.getEndTime(), now));
+        // Redis 原子扣减库存
+        Long newStock = redisTemplate.opsForValue().decrement(stockKey);
+        if (newStock == null || newStock < 0) {
+            // 库存不足，回滚
+            redisTemplate.opsForValue().increment(stockKey);
+            throw new BusinessException(4002, "优惠券已领完");
+        }
 
-        log.info("用户 {} 领取优惠券 {} 成功", userId, couponId);
+        // 标记用户已领取（防止重复领取）
+        redisTemplate.opsForSet().add(receivedKey, userId.toString());
+
+        // ========== 发送 MQ 消息异步写入数据库 ==========
+        String eventId = UUID.randomUUID().toString();
+        CouponReceiveEvent event = CouponReceiveEvent.builder()
+                .couponId(couponId)
+                .userId(userId)
+                .expireTime(coupon.getEndTime())
+                .eventId(eventId)
+                .receiveTime(now)
+                .build();
+
+        eventPublisher.publishCouponReceiveEvent(event);
+
+        log.info("用户 {} 领取优惠券 {} 成功（异步入库中），eventId: {}", userId, couponId, eventId);
     }
 
     @Override
@@ -212,7 +261,8 @@ public class CouponServiceImpl implements CouponService {
         // 生成批次ID
         String batchId = UUID.randomUUID().toString();
 
-        // 异步发放：发送MQ消息
+        // 构建批量消息
+        List<CouponGrantEvent> events = new ArrayList<>();
         for (Long userId : userIds) {
             CouponGrantEvent event = CouponGrantEvent.builder()
                     .couponId(couponId)
@@ -222,8 +272,11 @@ public class CouponServiceImpl implements CouponService {
                     .eventId(UUID.randomUUID().toString())
                     .grantTime(LocalDateTime.now())
                     .build();
-            eventPublisher.publishCouponGrantEvent(event);
+            events.add(event);
         }
+
+        // 批量发送 MQ 消息
+        eventPublisher.publishCouponGrantBatch(events);
 
         log.info("优惠券发放任务已提交, couponId: {}, 批次ID: {}, 用户数: {}", couponId, batchId, userIds.size());
     }
@@ -303,6 +356,7 @@ public class CouponServiceImpl implements CouponService {
 
     /**
      * 转换为用户优惠券VO
+     * 优化：优先使用JOIN查询返回的优惠券信息，避免N+1问题
      */
     private UserCouponVO convertToUserCouponVO(UserCoupon userCoupon) {
         UserCouponVO.UserCouponVOBuilder builder = UserCouponVO.builder()
@@ -314,14 +368,23 @@ public class CouponServiceImpl implements CouponService {
                 .expireTime(userCoupon.getExpireTime())
                 .orderId(userCoupon.getOrderId());
 
-        // 查询优惠券详情
-        Coupon coupon = couponMapper.selectById(userCoupon.getCouponId());
-        if (coupon != null) {
-            builder.couponName(coupon.getCouponName())
-                    .couponType(coupon.getCouponType())
-                    .fullAmount(coupon.getFullAmount())
-                    .reduceAmount(coupon.getReduceAmount())
-                    .categoryId(coupon.getCategoryId());
+        // 优先使用JOIN查询返回的优惠券信息（避免N+1问题）
+        if (userCoupon.getCouponName() != null) {
+            builder.couponName(userCoupon.getCouponName())
+                    .couponType(userCoupon.getCouponType())
+                    .fullAmount(userCoupon.getFullAmount())
+                    .reduceAmount(userCoupon.getReduceAmount())
+                    .categoryId(userCoupon.getCategoryId());
+        } else {
+            // 仅在JOIN未返回信息时单独查询（兜底）
+            Coupon coupon = couponMapper.selectById(userCoupon.getCouponId());
+            if (coupon != null) {
+                builder.couponName(coupon.getCouponName())
+                        .couponType(coupon.getCouponType())
+                        .fullAmount(coupon.getFullAmount())
+                        .reduceAmount(coupon.getReduceAmount())
+                        .categoryId(coupon.getCategoryId());
+            }
         }
 
         return builder.build();
