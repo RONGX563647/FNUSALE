@@ -62,6 +62,11 @@ public class OrderEvaluation {
     private String evaluationImageUrl;
 
     /**
+     * 是否匿名评价（0-否, 1-是）
+     */
+    private Integer isAnonymous;
+
+    /**
      * 卖家回复内容
      */
     private String replyContent;

@@ -12,6 +12,12 @@ CREATE TABLE IF NOT EXISTS `t_im_session` (
     `unread_count_u1` int DEFAULT 0 COMMENT '用户1未读消息数',
     `unread_count_u2` int DEFAULT 0 COMMENT '用户2未读消息数',
     `session_status` varchar(20) DEFAULT 'NORMAL' COMMENT '会话状态（NORMAL/CLOSED）',
+    `is_pinned_u1` tinyint DEFAULT 0 COMMENT '用户1是否置顶（0-否, 1-是）',
+    `is_pinned_u2` tinyint DEFAULT 0 COMMENT '用户2是否置顶（0-否, 1-是）',
+    `pinned_time_u1` datetime DEFAULT NULL COMMENT '用户1置顶时间',
+    `pinned_time_u2` datetime DEFAULT NULL COMMENT '用户2置顶时间',
+    `is_deleted_u1` tinyint DEFAULT 0 COMMENT '用户1是否删除会话（0-否, 1-是）',
+    `is_deleted_u2` tinyint DEFAULT 0 COMMENT '用户2是否删除会话（0-否, 1-是）',
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
@@ -47,3 +53,24 @@ CREATE TABLE IF NOT EXISTS `t_im_quick_reply` (
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='快捷回复模板表';
+
+-- 用户自定义快捷回复表
+CREATE TABLE IF NOT EXISTS `t_im_user_quick_reply` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `user_id` bigint NOT NULL COMMENT '用户ID',
+    `reply_content` varchar(200) NOT NULL COMMENT '回复内容',
+    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户自定义快捷回复表';
+
+-- 插入系统预设快捷回复模板
+INSERT INTO `t_im_quick_reply` (`reply_content`, `enable_status`, `sort`) VALUES
+('几成新？', 1, 1),
+('能小刀吗？', 1, 2),
+('什么时候自提？', 1, 3),
+('还在吗？', 1, 4),
+('可以包邮吗？', 1, 5),
+('最低多少钱？', 1, 6),
+('可以看看实物图吗？', 1, 7),
+('在哪里交易？', 1, 8);

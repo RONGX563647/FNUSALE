@@ -82,4 +82,19 @@ public class Order extends BaseEntity {
      * 成交时间
      */
     private LocalDateTime successTime;
+
+    /**
+     * 商品备好时间（卖家标记）
+     */
+    private LocalDateTime readyTime;
+
+    /**
+     * 延长收货天数
+     */
+    private Integer extendReceiveDays;
+
+    /**
+     * 关联的优惠券ID
+     */
+    private Long couponId;
 }

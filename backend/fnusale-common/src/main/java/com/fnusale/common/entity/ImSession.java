@@ -69,4 +69,34 @@ public class ImSession {
      * 更新时间
      */
     private LocalDateTime updateTime;
+
+    /**
+     * 用户1是否置顶（0-否, 1-是）
+     */
+    private Integer isPinnedU1;
+
+    /**
+     * 用户2是否置顶（0-否, 1-是）
+     */
+    private Integer isPinnedU2;
+
+    /**
+     * 用户1置顶时间
+     */
+    private LocalDateTime pinnedTimeU1;
+
+    /**
+     * 用户2置顶时间
+     */
+    private LocalDateTime pinnedTimeU2;
+
+    /**
+     * 用户1是否删除会话（0-否, 1-是）
+     */
+    private Integer isDeletedU1;
+
+    /**
+     * 用户2是否删除会话（0-否, 1-是）
+     */
+    private Integer isDeletedU2;
 }
