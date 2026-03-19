@@ -28,6 +28,16 @@ public class OperationStatistics {
     private LocalDate statDate;
 
     /**
+     * 当日新增用户数
+     */
+    private Integer newUserCount;
+
+    /**
+     * 当日活跃用户数
+     */
+    private Integer activeUserCount;
+
+    /**
      * 当日商品发布数
      */
     private Integer productPublishCount;
@@ -56,16 +66,6 @@ public class OperationStatistics {
      * 当日优惠券使用数
      */
     private Integer couponUseCount;
-
-    /**
-     * 当日新增用户数
-     */
-    private Integer newUserCount;
-
-    /**
-     * 当日活跃用户数
-     */
-    private Integer activeUserCount;
 
     /**
      * 创建时间

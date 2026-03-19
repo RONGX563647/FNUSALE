@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.util.List;
 
 /**
  * 商品品类VO
@@ -26,4 +27,7 @@ public class ProductCategoryVO implements Serializable {
 
     @Schema(description = "启用状态")
     private Integer enableStatus;
+
+    @Schema(description = "子品类列表")
+    private List<ProductCategoryVO> children;
 }

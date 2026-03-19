@@ -281,6 +281,29 @@ public class RedisService {
         return redisTemplate.opsForZSet().remove(key, (Object[]) members);
     }
 
+    // ==================== String 操作 ====================
+
+    /**
+     * 设置字符串值
+     */
+    public void set(String key, String value) {
+        redisTemplate.opsForValue().set(key, value);
+    }
+
+    /**
+     * 设置字符串值（带过期时间）
+     */
+    public void set(String key, String value, long timeout, TimeUnit unit) {
+        redisTemplate.opsForValue().set(key, value, timeout, unit);
+    }
+
+    /**
+     * 获取字符串值
+     */
+    public String get(String key) {
+        return redisTemplate.opsForValue().get(key);
+    }
+
     // ==================== 通用操作 ====================
 
     /**
