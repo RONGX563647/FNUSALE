@@ -188,88 +188,87 @@ INSERT IGNORE INTO roles (username, role) VALUES ('nacos', 'ROLE_ADMIN');
 
 -- 用户表（t_user）
 CREATE TABLE IF NOT EXISTS `t_user` (
-    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '用户ID',
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
     `student_teacher_id` varchar(50) DEFAULT NULL COMMENT '学号/工号',
     `username` varchar(50) NOT NULL COMMENT '用户名',
     `phone` varchar(20) DEFAULT NULL COMMENT '手机号',
     `campus_email` varchar(100) DEFAULT NULL COMMENT '校园邮箱',
     `password` varchar(255) NOT NULL COMMENT '密码',
-    `identity_type` varchar(20) DEFAULT NULL COMMENT '身份类型（STUDENT/TEACHER）',
+    `identity_type` varchar(20) DEFAULT 'STUDENT' COMMENT '身份类型（STUDENT/TEACHER）',
     `auth_status` varchar(20) DEFAULT 'UNAUTH' COMMENT '认证状态（UNAUTH/UNDER_REVIEW/AUTH_SUCCESS/AUTH_FAILED）',
     `auth_image_url` varchar(500) DEFAULT NULL COMMENT '校园卡/学生证审核图片地址',
     `auth_result_remark` varchar(255) DEFAULT NULL COMMENT '认证审核备注',
-    `location_permission` varchar(20) DEFAULT 'DENY' COMMENT '定位权限状态（ALLOW/DENY）',
+    `location_permission` varchar(10) DEFAULT 'DENY' COMMENT '定位权限状态（ALLOW/DENY）',
     `credit_score` int DEFAULT 100 COMMENT '信誉分（默认100）',
     `avatar_url` varchar(500) DEFAULT NULL COMMENT '头像地址',
     `birthday` date DEFAULT NULL COMMENT '生日',
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `is_deleted` tinyint DEFAULT 0 COMMENT '是否删除: 0-未删除, 1-已删除',
+    `is_deleted` tinyint DEFAULT 0 COMMENT '逻辑删除标记（0-未删除, 1-已删除）',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_student_teacher_id` (`student_teacher_id`),
     UNIQUE KEY `uk_phone` (`phone`),
     UNIQUE KEY `uk_campus_email` (`campus_email`),
     KEY `idx_create_time` (`create_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户基础表';
 
--- 管理员用户表（sys_user）
-CREATE TABLE IF NOT EXISTS `sys_user` (
+-- 管理员表（t_admin）
+CREATE TABLE IF NOT EXISTS `t_admin` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '用户ID',
     `username` varchar(50) NOT NULL COMMENT '用户名',
     `password` varchar(255) NOT NULL COMMENT '密码',
     `nickname` varchar(50) DEFAULT NULL COMMENT '昵称',
-    `avatar` varchar(500) DEFAULT NULL COMMENT '头像URL',
-    `phone` varchar(20) DEFAULT NULL COMMENT '手机号',
-    `email` varchar(100) DEFAULT NULL COMMENT '邮箱',
-    `status` tinyint DEFAULT 0 COMMENT '状态: 0-正常, 1-禁用',
+    `avatar_url` varchar(500) DEFAULT NULL COMMENT '头像URL',
+    `role` varchar(20) DEFAULT 'OPERATOR' COMMENT '角色（SUPER_ADMIN/OPERATOR/SERVICE）',
+    `status` tinyint DEFAULT 1 COMMENT '状态: 0-禁用, 1-启用',
+    `last_login_time` datetime DEFAULT NULL COMMENT '最后登录时间',
+    `last_login_ip` varchar(50) DEFAULT NULL COMMENT '最后登录IP',
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `is_deleted` tinyint DEFAULT 0 COMMENT '是否删除: 0-未删除, 1-已删除',
+    `is_deleted` tinyint DEFAULT 0 COMMENT '逻辑删除标记（0-未删除, 1-已删除）',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_username` (`username`),
-    KEY `idx_create_time` (`create_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='管理员用户表';
+    UNIQUE KEY `uk_username` (`username`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='管理员表';
 
--- 商品分类表
+-- 商品品类表
 CREATE TABLE IF NOT EXISTS `t_product_category` (
-    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '分类ID',
-    `category_name` varchar(50) NOT NULL COMMENT '分类名称',
-    `parent_category_id` bigint DEFAULT 0 COMMENT '父分类ID',
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `category_name` varchar(50) NOT NULL COMMENT '品类名称',
+    `parent_category_id` bigint DEFAULT NULL COMMENT '父品类ID',
     `ai_mapping_value` varchar(100) DEFAULT NULL COMMENT 'AI分类映射值',
-    `enable_status` tinyint DEFAULT 1 COMMENT '状态: 0-禁用, 1-启用',
+    `enable_status` tinyint DEFAULT 1 COMMENT '启用状态（0-禁用, 1-启用）',
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`),
     KEY `idx_parent_category_id` (`parent_category_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商品分类表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商品品类表';
 
--- 商品表
+-- 商品基础表
 CREATE TABLE IF NOT EXISTS `t_product` (
-    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '商品ID',
-    `user_id` bigint NOT NULL COMMENT '发布用户ID',
-    `category_id` bigint NOT NULL COMMENT '分类ID',
-    `product_name` varchar(200) NOT NULL COMMENT '商品名称',
-    `product_desc` text COMMENT '商品描述',
-    `price` decimal(10,2) NOT NULL COMMENT '价格',
-    `original_price` decimal(10,2) DEFAULT NULL COMMENT '原价',
-    `new_degree` varchar(20) DEFAULT 'NEW' COMMENT '新旧程度（NEW/90_NEW/80_NEW/70_NEW/OLD）',
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `user_id` bigint NOT NULL COMMENT '发布者ID',
+    `product_name` varchar(100) NOT NULL COMMENT '商品名称',
+    `category_id` bigint NOT NULL COMMENT '品类ID',
+    `new_degree` varchar(20) NOT NULL COMMENT '新旧程度（NEW/90_NEW/80_NEW/70_NEW/OLD）',
+    `price` decimal(10,2) NOT NULL COMMENT '售价（元）',
+    `original_price` decimal(10,2) DEFAULT NULL COMMENT '原价（元）',
+    `product_desc` varchar(500) DEFAULT NULL COMMENT '商品描述',
+    `is_seckill` tinyint DEFAULT 0 COMMENT '是否秒杀商品（0-否, 1-是）',
+    `seckill_stock` int DEFAULT NULL COMMENT '秒杀库存',
+    `pick_point_id` bigint DEFAULT NULL COMMENT '自提点ID',
     `longitude` decimal(10,6) DEFAULT NULL COMMENT '发布时定位经度',
     `latitude` decimal(10,6) DEFAULT NULL COMMENT '发布时定位纬度',
-    `is_seckill` tinyint DEFAULT 0 COMMENT '是否秒杀商品',
-    `seckill_stock` int DEFAULT 0 COMMENT '秒杀库存',
-    `pick_point_id` bigint DEFAULT NULL COMMENT '自提点ID',
-    `product_status` varchar(20) DEFAULT 'DRAFT' COMMENT '状态（DRAFT/ON_SHELF/SOLD_OUT/OFF_SHELF/ILLEGAL）',
-    `illegal_reason` varchar(255) DEFAULT NULL COMMENT '违规原因',
-    `ai_category_result` varchar(100) DEFAULT NULL COMMENT 'AI分类结果',
+    `product_status` varchar(20) NOT NULL COMMENT '状态（DRAFT/ON_SHELF/SOLD_OUT/OFF_SHELF/ILLEGAL）',
+    `illegal_reason` varchar(200) DEFAULT NULL COMMENT '违规原因',
+    `ai_category_result` varchar(500) DEFAULT NULL COMMENT 'AI分类结果',
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `is_deleted` tinyint DEFAULT 0 COMMENT '是否删除',
+    `is_deleted` tinyint DEFAULT 0 COMMENT '逻辑删除标记（0-未删除, 1-已删除）',
     PRIMARY KEY (`id`),
     KEY `idx_user_id` (`user_id`),
     KEY `idx_category_id` (`category_id`),
     KEY `idx_product_status` (`product_status`),
-    KEY `idx_create_time` (`create_time`),
-    KEY `idx_price` (`price`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商品表';
+    KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商品基础表';
 
 -- 订单表
 CREATE TABLE IF NOT EXISTS `t_order` (
@@ -278,6 +277,7 @@ CREATE TABLE IF NOT EXISTS `t_order` (
     `user_id` bigint NOT NULL COMMENT '买家ID',
     `product_id` bigint NOT NULL COMMENT '商品ID',
     `product_price` decimal(10,2) NOT NULL COMMENT '商品原价',
+    `coupon_id` bigint DEFAULT NULL COMMENT '优惠券ID',
     `coupon_deduct_amount` decimal(10,2) DEFAULT 0 COMMENT '优惠券抵扣金额',
     `actual_pay_amount` decimal(10,2) NOT NULL COMMENT '实付金额',
     `pick_point_id` bigint DEFAULT NULL COMMENT '自提点ID',
@@ -285,6 +285,8 @@ CREATE TABLE IF NOT EXISTS `t_order` (
     `pay_status` varchar(20) DEFAULT 'UNPAID' COMMENT '支付状态（UNPAID/PAID/REFUNDED）',
     `order_status` varchar(20) DEFAULT 'UNPAID' COMMENT '订单状态（UNPAID/WAIT_PICK/SUCCESS/CANCEL）',
     `cancel_reason` varchar(255) DEFAULT NULL COMMENT '取消原因',
+    `ready_time` datetime DEFAULT NULL COMMENT '商品备好时间',
+    `extend_receive_days` int DEFAULT 0 COMMENT '延长收货天数',
     `success_time` datetime DEFAULT NULL COMMENT '成交时间',
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -297,14 +299,14 @@ CREATE TABLE IF NOT EXISTS `t_order` (
     KEY `idx_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单表';
 
--- 插入默认商品分类
-INSERT IGNORE INTO t_product_category (id, category_name, parent_category_id, enable_status) VALUES
-(1, '教材书籍', 0, 1),
-(2, '电子产品', 0, 1),
-(3, '生活用品', 0, 1),
-(4, '体育器材', 0, 1),
-(5, '服装鞋帽', 0, 1),
-(6, '其他', 0, 1);
+-- 插入默认商品品类
+INSERT IGNORE INTO t_product_category (id, category_name, parent_category_id, ai_mapping_value, enable_status) VALUES
+(1, '教材书籍', NULL, 'books,textbook', 1),
+(2, '电子产品', NULL, 'electronics,digital', 1),
+(3, '生活用品', NULL, 'daily,lifestyle', 1),
+(4, '体育器材', NULL, 'sports,equipment', 1),
+(5, '服装鞋帽', NULL, 'clothing,fashion', 1),
+(6, '其他', NULL, 'other', 1);
 
 -- ==================== 用户相关表 ====================
 
@@ -377,6 +379,12 @@ CREATE TABLE IF NOT EXISTS `t_im_session` (
     `unread_count_u1` int DEFAULT 0 COMMENT '用户1未读消息数',
     `unread_count_u2` int DEFAULT 0 COMMENT '用户2未读消息数',
     `session_status` varchar(20) DEFAULT 'NORMAL' COMMENT '会话状态（NORMAL/CLOSED）',
+    `is_pinned_u1` tinyint DEFAULT 0 COMMENT '用户1是否置顶（0-否, 1-是）',
+    `is_pinned_u2` tinyint DEFAULT 0 COMMENT '用户2是否置顶（0-否, 1-是）',
+    `pinned_time_u1` datetime DEFAULT NULL COMMENT '用户1置顶时间',
+    `pinned_time_u2` datetime DEFAULT NULL COMMENT '用户2置顶时间',
+    `is_deleted_u1` tinyint DEFAULT 0 COMMENT '用户1是否删除会话（0-否, 1-是）',
+    `is_deleted_u2` tinyint DEFAULT 0 COMMENT '用户2是否删除会话（0-否, 1-是）',
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
@@ -412,6 +420,16 @@ CREATE TABLE IF NOT EXISTS `t_im_quick_reply` (
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='快捷回复模板表';
+
+-- 用户自定义快捷回复表
+CREATE TABLE IF NOT EXISTS `t_im_user_quick_reply` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `user_id` bigint NOT NULL COMMENT '用户ID',
+    `reply_content` varchar(200) NOT NULL COMMENT '回复内容',
+    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户自定义快捷回复表';
 
 -- ==================== 用户行为表 ====================
 
@@ -510,6 +528,7 @@ CREATE TABLE IF NOT EXISTS `t_order_evaluation` (
     `evaluation_tag` varchar(100) DEFAULT NULL COMMENT '评价标签',
     `evaluation_content` varchar(500) DEFAULT NULL COMMENT '评价内容',
     `evaluation_image_url` varchar(500) DEFAULT NULL COMMENT '评价图片地址',
+    `is_anonymous` tinyint DEFAULT 0 COMMENT '是否匿名评价（0-否, 1-是）',
     `reply_content` varchar(500) DEFAULT NULL COMMENT '卖家回复内容',
     `reply_time` datetime DEFAULT NULL COMMENT '回复时间',
     `append_content` varchar(500) DEFAULT NULL COMMENT '追加评价内容',
@@ -697,14 +716,13 @@ CREATE TABLE IF NOT EXISTS `t_points_log` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
     `user_id` bigint NOT NULL COMMENT '用户ID',
     `change_type` varchar(30) NOT NULL COMMENT '变动类型（SIGN_REWARD/CONTINUOUS_REWARD/REPAIR_COST/COUPON_EXCHANGE/PRODUCT_TOP/TRADE_REWARD/RANK_REWARD/BIRTHDAY_REWARD）',
-    `change_amount` int NOT NULL COMMENT '变动数量（正负）',
-    `before_points` int NOT NULL COMMENT '变动前积分',
-    `after_points` int NOT NULL COMMENT '变动后积分',
-    `remark` varchar(200) DEFAULT NULL COMMENT '备注',
+    `change_amount` int NOT NULL COMMENT '变动数量（正数增加，负数减少）',
+    `before_points` int DEFAULT 0 COMMENT '变动前积分',
+    `after_points` int DEFAULT 0 COMMENT '变动后积分',
+    `remark` varchar(255) DEFAULT NULL COMMENT '备注',
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`),
     KEY `idx_user_id` (`user_id`),
-    KEY `idx_change_type` (`change_type`),
     KEY `idx_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='积分变动日志表';
 
@@ -715,7 +733,7 @@ CREATE TABLE IF NOT EXISTS `t_user_rating` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
     `user_id` bigint NOT NULL COMMENT '用户ID',
     `overall_rating` decimal(3,2) DEFAULT 5.00 COMMENT '综合评分（1.00-5.00）',
-    `rating_level` varchar(20) DEFAULT 'EXCELLENT' COMMENT '评分等级（EXCELLENT/VERY_GOOD/GOOD/AVERAGE/POOR/VERY_POOR）',
+    `rating_level` varchar(20) DEFAULT 'GOOD' COMMENT '评分等级（EXCELLENT/VERY_GOOD/GOOD/AVERAGE/POOR/VERY_POOR）',
     `total_evaluations` int DEFAULT 0 COMMENT '累计评价数',
     `positive_count` int DEFAULT 0 COMMENT '好评数（4-5星）',
     `neutral_count` int DEFAULT 0 COMMENT '中评数（3星）',
@@ -726,9 +744,7 @@ CREATE TABLE IF NOT EXISTS `t_user_rating` (
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_user_id` (`user_id`),
-    KEY `idx_overall_rating` (`overall_rating`),
-    KEY `idx_positive_rate` (`positive_rate`)
+    UNIQUE KEY `uk_user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户评价分表';
 
 -- 评价标签统计表
@@ -740,7 +756,7 @@ CREATE TABLE IF NOT EXISTS `t_evaluation_tag_stat` (
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_user_tag` (`user_id`, `tag_name`),
-    KEY `idx_tag_count` (`tag_count`)
+    KEY `idx_user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='评价标签统计表';
 
 -- ==================== 排行榜相关表 ====================
@@ -755,9 +771,8 @@ CREATE TABLE IF NOT EXISTS `t_ranking_record` (
     `score` decimal(10,2) DEFAULT 0.00 COMMENT '得分',
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`),
-    KEY `idx_type_date` (`rank_type`, `rank_date`),
-    KEY `idx_user_type` (`user_id`, `rank_type`),
-    KEY `idx_rank_position` (`rank_position`)
+    UNIQUE KEY `uk_user_type_date` (`user_id`, `rank_type`, `rank_date`),
+    KEY `idx_rank_type_date` (`rank_type`, `rank_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='排行榜记录表';
 
 -- 排行榜奖励记录表
@@ -772,8 +787,8 @@ CREATE TABLE IF NOT EXISTS `t_ranking_reward_log` (
     `is_claimed` tinyint DEFAULT 0 COMMENT '是否已领取（0-未领取, 1-已领取）',
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`),
-    KEY `idx_user_date` (`user_id`, `rank_date`),
-    KEY `idx_type_date` (`rank_type`, `rank_date`)
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_rank_type_date` (`rank_type`, `rank_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='排行榜奖励记录表';
 
 -- ==================== 初始化数据 ====================

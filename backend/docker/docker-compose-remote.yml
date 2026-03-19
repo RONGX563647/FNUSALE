@@ -1,12 +1,11 @@
 # 校园二手交易平台 - 基础设施 Docker Compose 配置
-# 适用于开发环境，单节点部署
+# 远程服务器版本 (x86架构)
 # 技术栈：MySQL 8.0 + Redis 7.0 + Elasticsearch 8.0 + MinIO + Nacos 2.3.0 + Sentinel 1.8.6 + RocketMQ 5.1.0 + Prometheus + Grafana
 
 services:
   # ==================== 数据存储层 ====================
 
   # MySQL 8.0 - 主数据库
-  # 用途：存储用户、商品、订单等核心业务数据
   mysql:
     image: mysql:8.0
     container_name: fnusale-mysql
@@ -28,26 +27,15 @@ services:
       - --default-authentication-plugin=mysql_native_password
       - --max_connections=500
       - --innodb_buffer_pool_size=256M
-      - --query_cache_size=0
-      - --query_cache_type=0
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root123456}"]
       interval: 10s
       timeout: 5s
       retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 512M
-        reservations:
-          cpus: '0.5'
-          memory: 256M
     networks:
       - fnusale-network
 
   # Redis 7.0 - 缓存/秒杀库存/IM会话
-  # 用途：缓存热点数据、秒杀库存预扣、IM在线用户状态、排行榜、签到记录
   redis:
     image: redis:7.0-alpine
     container_name: fnusale-redis
@@ -67,19 +55,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
     networks:
       - fnusale-network
 
   # Elasticsearch 8.0 - 商品搜索
-  # 用途：商品全文检索、关键词搜索、多维度筛选
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.0.0
     container_name: fnusale-elasticsearch
@@ -92,7 +71,6 @@ services:
       - xpack.security.enabled=false
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
       - cluster.name=fnusale-es
-      - node.name=fnusale-es-node1
     volumes:
       - es_data:/usr/share/elasticsearch/data
     healthcheck:
@@ -100,19 +78,10 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
     networks:
       - fnusale-network
 
-  # MinIO - 对象存储（OSS替代）
-  # 用途：存储商品图片、用户头像、认证证件照片等文件
+  # MinIO - 对象存储
   minio:
     image: minio/minio:latest
     container_name: fnusale-minio
@@ -132,23 +101,14 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
     networks:
       - fnusale-network
 
   # ==================== 微服务治理层 ====================
 
-  # Nacos 2.3.0 - 注册/配置中心 (ARM兼容镜像)
-  # 用途：微服务注册发现、配置中心、服务治理
+  # Nacos 2.3.0 - 注册/配置中心 (x86版本)
   nacos:
-    image: haoyu6/nacos-server-arm64:v2.2.3
+    image: nacos/nacos-server:v2.2.3
     container_name: fnusale-nacos
     restart: unless-stopped
     ports:
@@ -180,19 +140,10 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 768M
-        reservations:
-          cpus: '0.5'
-          memory: 512M
     networks:
       - fnusale-network
 
   # Sentinel Dashboard 1.8.6 - 限流/熔断控制台
-  # 用途：秒杀接口限流、服务熔断降级、实时监控
   sentinel:
     image: bladex/sentinel-dashboard:1.8.6
     container_name: fnusale-sentinel
@@ -204,21 +155,12 @@ services:
       - SENTINEL_SERVER_UNAME=${SENTINEL_USER:-sentinel}
       - SENTINEL_SERVER_PASSWORD=${SENTINEL_PASSWORD:-sentinel123456}
       - JAVA_OPTS=-Dserver.port=8858 -Dcsp.sentinel.dashboard.server=localhost:8858 -Dproject.name=sentinel-dashboard
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
     networks:
       - fnusale-network
 
   # ==================== 消息队列 ====================
 
   # RocketMQ NameServer
-  # 用途：消息队列注册中心，Broker注册与发现
   rocketmq-nameserver:
     image: apache/rocketmq:5.1.0
     container_name: fnusale-rocketmq-nameserver
@@ -230,19 +172,10 @@ services:
     command: ["sh", "mqnamesrv"]
     volumes:
       - rocketmq_nameserver_logs:/home/rocketmq/logs
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
     networks:
       - fnusale-network
 
   # RocketMQ Broker
-  # 用途：消息存储与转发，支持秒杀削峰、IM消息异步推送、订单异步处理
   rocketmq-broker:
     image: apache/rocketmq:5.1.0
     container_name: fnusale-rocketmq-broker
@@ -261,19 +194,10 @@ services:
       - ./rocketmq/broker.conf:/home/rocketmq/rocketmq-5.1.0/conf/broker.conf:ro
     depends_on:
       - rocketmq-nameserver
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 768M
-        reservations:
-          cpus: '0.5'
-          memory: 512M
     networks:
       - fnusale-network
 
-  # RocketMQ Dashboard - 消息队列管理控制台
-  # 用途：可视化管理和监控RocketMQ，查看消息、Topic、消费者组等
+  # RocketMQ Dashboard
   rocketmq-dashboard:
     image: apacherocketmq/rocketmq-dashboard:latest
     container_name: fnusale-rocketmq-dashboard
@@ -285,21 +209,12 @@ services:
     depends_on:
       - rocketmq-nameserver
       - rocketmq-broker
-    deploy:
-      resources:
-        limits:
-          cpus: '0.25'
-          memory: 256M
-        reservations:
-          cpus: '0.1'
-          memory: 128M
     networks:
       - fnusale-network
 
   # ==================== 监控层 ====================
 
   # Prometheus - 监控数据采集
-  # 用途：采集微服务指标数据，监控服务健康状态、秒杀QPS、缓存命中率等
   prometheus:
     image: prom/prometheus:latest
     container_name: fnusale-prometheus
@@ -313,22 +228,10 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--web.enable-lifecycle'
-      - '--storage.tsdb.retention.time=15d'
-      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-      - '--web.console.templates=/usr/share/prometheus/consoles'
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
     networks:
       - fnusale-network
 
   # Grafana - 监控可视化
-  # 用途：可视化展示监控数据，配置告警规则
   grafana:
     image: grafana/grafana:latest
     container_name: fnusale-grafana
@@ -338,21 +241,12 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-grafana123456}
-      GF_INSTALL_PLUGINS: ""
       GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s:%(http_port)s/"
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - grafana_data:/var/lib/grafana
     depends_on:
       - prometheus
-    deploy:
-      resources:
-        limits:
-          cpus: '0.25'
-          memory: 256M
-        reservations:
-          cpus: '0.1'
-          memory: 128M
     networks:
       - fnusale-network
 
@@ -363,35 +257,24 @@ networks:
     name: fnusale-network
 
 # ==================== 数据卷配置 ====================
-# 数据持久化配置，所有数据存储在Docker命名卷中
 volumes:
-  # MySQL数据卷
   mysql_data:
     name: fnusale-mysql-data
-  # Redis数据卷
   redis_data:
     name: fnusale-redis-data
-  # Elasticsearch数据卷
   es_data:
     name: fnusale-es-data
-  # MinIO对象存储数据卷
   minio_data:
     name: fnusale-minio-data
-  # Nacos日志数据卷
   nacos_data:
     name: fnusale-nacos-data
-  # RocketMQ NameServer日志
   rocketmq_nameserver_logs:
     name: fnusale-rocketmq-ns-logs
-  # RocketMQ Broker日志
   rocketmq_broker_logs:
     name: fnusale-rocketmq-broker-logs
-  # RocketMQ Broker存储
   rocketmq_broker_store:
     name: fnusale-rocketmq-broker-store
-  # Prometheus监控数据
   prometheus_data:
     name: fnusale-prometheus-data
-  # Grafana仪表板配置
   grafana_data:
     name: fnusale-grafana-data
