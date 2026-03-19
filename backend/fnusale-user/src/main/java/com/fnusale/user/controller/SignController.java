@@ -4,13 +4,13 @@ import com.fnusale.common.common.PageResult;
 import com.fnusale.common.common.Result;
 import com.fnusale.common.dto.user.SignDTO;
 import com.fnusale.common.enums.ResultCode;
+import com.fnusale.common.util.UserContext;
 import com.fnusale.common.vo.user.SignRecordVO;
 import com.fnusale.common.vo.user.SignResultVO;
 import com.fnusale.common.vo.user.SignStatusVO;
 import com.fnusale.common.vo.user.UserPointsVO;
 import com.fnusale.user.service.UserPointsService;
 import com.fnusale.user.service.UserSignService;
-import com.fnusale.user.service.impl.UserServiceImpl;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,7 +36,7 @@ public class SignController {
     @Operation(summary = "每日签到", description = "用户每日签到一次，获得基础积分和连续签到奖励")
     @PostMapping
     public Result<SignResultVO> sign() {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         if (userId == null) {
             return Result.failed(ResultCode.UNAUTHORIZED.getCode(), "用户未登录");
         }
@@ -47,7 +47,7 @@ public class SignController {
     @Operation(summary = "查询签到状态", description = "查询今日是否已签到，返回连续签到天数、累计签到天数等信息")
     @GetMapping("/status")
     public Result<SignStatusVO> getSignStatus() {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         if (userId == null) {
             return Result.failed(ResultCode.UNAUTHORIZED.getCode(), "用户未登录");
         }
@@ -58,7 +58,7 @@ public class SignController {
     @Operation(summary = "签到统计", description = "获取签到统计信息，包括连续签到天数、累计签到天数、下次奖励等")
     @GetMapping("/statistics")
     public Result<SignStatusVO> getSignStatistics() {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         if (userId == null) {
             return Result.failed(ResultCode.UNAUTHORIZED.getCode(), "用户未登录");
         }
@@ -71,7 +71,7 @@ public class SignController {
     public Result<PageResult<SignRecordVO>> getSignRecords(
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer pageNum,
             @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") Integer pageSize) {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         if (userId == null) {
             return Result.failed(ResultCode.UNAUTHORIZED.getCode(), "用户未登录");
         }
@@ -83,7 +83,7 @@ public class SignController {
     @GetMapping("/calendar/{month}")
     public Result<List<String>> getSignCalendar(
             @Parameter(description = "月份，格式：yyyy-MM", required = true) @PathVariable String month) {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         if (userId == null) {
             return Result.failed(ResultCode.UNAUTHORIZED.getCode(), "用户未登录");
         }
@@ -95,7 +95,7 @@ public class SignController {
     @PostMapping("/repair")
     public Result<SignResultVO> repairSign(
             @Parameter(description = "补签请求", required = true) @Valid @RequestBody SignDTO dto) {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         if (userId == null) {
             return Result.failed(ResultCode.UNAUTHORIZED.getCode(), "用户未登录");
         }
@@ -106,7 +106,7 @@ public class SignController {
     @Operation(summary = "获取我的积分", description = "获取当前用户积分信息")
     @GetMapping("/points")
     public Result<UserPointsVO> getMyPoints() {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         if (userId == null) {
             return Result.failed(ResultCode.UNAUTHORIZED.getCode(), "用户未登录");
         }
@@ -119,7 +119,7 @@ public class SignController {
     public Result<PageResult<Object>> getPointsLogs(
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer pageNum,
             @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") Integer pageSize) {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         if (userId == null) {
             return Result.failed(ResultCode.UNAUTHORIZED.getCode(), "用户未登录");
         }

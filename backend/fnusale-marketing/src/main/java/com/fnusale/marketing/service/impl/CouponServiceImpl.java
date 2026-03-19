@@ -6,12 +6,14 @@ import com.fnusale.common.constant.MarketingConstants;
 import com.fnusale.common.dto.marketing.CouponDTO;
 import com.fnusale.common.entity.Coupon;
 import com.fnusale.common.entity.UserCoupon;
+import com.fnusale.common.event.CouponGrantEvent;
 import com.fnusale.common.exception.BusinessException;
 import com.fnusale.common.vo.marketing.CouponVO;
 import com.fnusale.common.vo.marketing.UserCouponVO;
 import com.fnusale.marketing.mapper.CouponMapper;
 import com.fnusale.marketing.mapper.UserCouponMapper;
 import com.fnusale.marketing.service.CouponService;
+import com.fnusale.marketing.service.MarketingEventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -22,6 +24,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 优惠券服务实现
@@ -33,6 +36,7 @@ public class CouponServiceImpl implements CouponService {
 
     private final CouponMapper couponMapper;
     private final UserCouponMapper userCouponMapper;
+    private final MarketingEventPublisher eventPublisher;
 
     @Override
     public List<CouponVO> getAvailableCoupons(Long userId) {
@@ -195,7 +199,6 @@ public class CouponServiceImpl implements CouponService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void grantCoupon(Long couponId, List<Long> userIds) {
         Coupon coupon = couponMapper.selectById(couponId);
         if (coupon == null) {
@@ -206,30 +209,23 @@ public class CouponServiceImpl implements CouponService {
             throw new BusinessException(4006, "优惠券已禁用");
         }
 
-        LocalDateTime now = LocalDateTime.now();
-        int successCount = 0;
+        // 生成批次ID
+        String batchId = UUID.randomUUID().toString();
 
+        // 异步发放：发送MQ消息
         for (Long userId : userIds) {
-            // 检查是否已领取
-            int count = userCouponMapper.countByUserAndCoupon(userId, couponId);
-            if (count > 0) {
-                log.warn("用户 {} 已领取优惠券 {}，跳过", userId, couponId);
-                continue;
-            }
-
-            // 检查库存
-            int rows = couponMapper.incrementReceivedCount(couponId);
-            if (rows == 0) {
-                log.warn("优惠券 {} 库存不足，停止发放", couponId);
-                break;
-            }
-
-            // 创建用户优惠券记录
-            userCouponMapper.insert(createUserCoupon(userId, couponId, coupon.getEndTime(), now));
-            successCount++;
+            CouponGrantEvent event = CouponGrantEvent.builder()
+                    .couponId(couponId)
+                    .userId(userId)
+                    .batchId(batchId)
+                    .expireTime(coupon.getEndTime())
+                    .eventId(UUID.randomUUID().toString())
+                    .grantTime(LocalDateTime.now())
+                    .build();
+            eventPublisher.publishCouponGrantEvent(event);
         }
 
-        log.info("向 {} 位用户发放优惠券 {}，成功 {} 位", userIds.size(), couponId, successCount);
+        log.info("优惠券发放任务已提交, couponId: {}, 批次ID: {}, 用户数: {}", couponId, batchId, userIds.size());
     }
 
     @Override

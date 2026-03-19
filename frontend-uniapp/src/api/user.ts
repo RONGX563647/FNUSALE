@@ -28,6 +28,16 @@ import type {
 
 // 用户 API
 export const userApi = {
+  // 上传头像
+  uploadAvatar(file: any): Promise<Result<{ url: string }>> {
+    return http.upload('/upload/avatar', { file })
+  },
+
+  // 上传认证图片
+  uploadAuthImage(file: any): Promise<Result<{ url: string }>> {
+    return http.upload('/upload/auth', { file })
+  },
+
   // 用户注册（手机号）
   registerByPhone(data: Omit<UserRegisterDTO, 'registerType'>): Promise<Result<void>> {
     return http.post('/user/register/phone', { ...data, registerType: 'PHONE' })

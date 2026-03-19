@@ -6,10 +6,10 @@ import com.fnusale.common.dto.user.EvaluationAppendDTO;
 import com.fnusale.common.dto.user.EvaluationReplyDTO;
 import com.fnusale.common.dto.user.EvaluationReportDTO;
 import com.fnusale.common.dto.user.UserEvaluationDTO;
+import com.fnusale.common.util.UserContext;
 import com.fnusale.common.vo.user.UserEvaluationVO;
 import com.fnusale.common.vo.user.UserRatingVO;
 import com.fnusale.user.service.UserEvaluationService;
-import com.fnusale.user.service.impl.UserServiceImpl;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,7 +36,7 @@ public class UserEvaluationController {
     @PostMapping
     public Result<Void> submitEvaluation(
             @Parameter(description = "评价请求", required = true) @Valid @RequestBody UserEvaluationDTO dto) {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         userEvaluationService.submitEvaluation(userId, dto);
         return Result.success("评价成功", null);
     }
@@ -46,7 +46,7 @@ public class UserEvaluationController {
     public Result<Void> appendEvaluation(
             @Parameter(description = "评价ID", required = true) @PathVariable Long id,
             @Parameter(description = "追加评价请求", required = true) @Valid @RequestBody EvaluationAppendDTO dto) {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         userEvaluationService.appendEvaluation(userId, id, dto);
         return Result.success("追加成功", null);
     }
@@ -56,7 +56,7 @@ public class UserEvaluationController {
     public Result<Void> replyEvaluation(
             @Parameter(description = "评价ID", required = true) @PathVariable Long id,
             @Parameter(description = "回复请求", required = true) @Valid @RequestBody EvaluationReplyDTO dto) {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         userEvaluationService.replyEvaluation(userId, id, dto);
         return Result.success("回复成功", null);
     }
@@ -76,7 +76,7 @@ public class UserEvaluationController {
     public Result<PageResult<UserEvaluationVO>> getMyEvaluations(
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer pageNum,
             @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") Integer pageSize) {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         PageResult<UserEvaluationVO> result = userEvaluationService.getMyEvaluations(userId, pageNum, pageSize);
         return Result.success(result);
     }
@@ -102,7 +102,7 @@ public class UserEvaluationController {
     public Result<Void> reportEvaluation(
             @Parameter(description = "评价ID", required = true) @PathVariable Long id,
             @Parameter(description = "举报请求", required = true) @Valid @RequestBody EvaluationReportDTO dto) {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         userEvaluationService.reportEvaluation(userId, id, dto);
         return Result.success("举报成功，我们将尽快处理", null);
     }

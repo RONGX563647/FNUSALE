@@ -2,9 +2,9 @@ package com.fnusale.user.controller;
 
 import com.fnusale.common.common.Result;
 import com.fnusale.common.dto.user.UserAddressDTO;
+import com.fnusale.common.util.UserContext;
 import com.fnusale.common.vo.user.UserAddressVO;
 import com.fnusale.user.service.UserAddressService;
-import com.fnusale.user.service.impl.UserServiceImpl;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,7 +29,7 @@ public class UserAddressController {
     @Operation(summary = "获取我的地址列表", description = "获取当前用户的所有地址，每个用户最多10个地址")
     @GetMapping("/list")
     public Result<List<UserAddressVO>> getList() {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         List<UserAddressVO> list = userAddressService.getList(userId);
         return Result.success(list);
     }
@@ -38,7 +38,7 @@ public class UserAddressController {
     @GetMapping("/{id}")
     public Result<UserAddressVO> getById(
             @Parameter(description = "地址ID", required = true) @PathVariable Long id) {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         UserAddressVO vo = userAddressService.getById(userId, id);
         return Result.success(vo);
     }
@@ -47,7 +47,7 @@ public class UserAddressController {
     @PostMapping
     public Result<Void> add(
             @Parameter(description = "地址请求", required = true) @Valid @RequestBody UserAddressDTO dto) {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         userAddressService.add(userId, dto);
         return Result.success("添加成功", null);
     }
@@ -57,7 +57,7 @@ public class UserAddressController {
     public Result<Void> update(
             @Parameter(description = "地址ID", required = true) @PathVariable Long id,
             @Parameter(description = "地址请求", required = true) @Valid @RequestBody UserAddressDTO dto) {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         userAddressService.update(userId, id, dto);
         return Result.success("更新成功", null);
     }
@@ -66,7 +66,7 @@ public class UserAddressController {
     @DeleteMapping("/{id}")
     public Result<Void> delete(
             @Parameter(description = "地址ID", required = true) @PathVariable Long id) {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         userAddressService.delete(userId, id);
         return Result.success("删除成功", null);
     }
@@ -75,7 +75,7 @@ public class UserAddressController {
     @PutMapping("/{id}/default")
     public Result<Void> setDefault(
             @Parameter(description = "地址ID", required = true) @PathVariable Long id) {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         userAddressService.setDefault(userId, id);
         return Result.success("设置成功", null);
     }
@@ -83,7 +83,7 @@ public class UserAddressController {
     @Operation(summary = "获取默认地址", description = "获取当前用户的默认地址")
     @GetMapping("/default")
     public Result<UserAddressVO> getDefault() {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         UserAddressVO vo = userAddressService.getDefault(userId);
         return Result.success(vo);
     }

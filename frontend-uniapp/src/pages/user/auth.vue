@@ -69,6 +69,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useUserStore } from '@/stores/user'
+import { userApi } from '@/api/user'
 
 const userStore = useUserStore()
 
@@ -77,6 +78,8 @@ const formData = ref({
   studentTeacherId: '',
   authImageUrl: ''
 })
+
+const uploading = ref(false)
 
 const canSubmitAuth = computed(() => {
   const status = userStore.userInfo?.authStatus
@@ -130,11 +133,22 @@ const uploadImage = () => {
     count: 1,
     sizeType: ['compressed'],
     sourceType: ['album', 'camera'],
-    success: (res) => {
+    success: async (res) => {
       const tempFilePath = res.tempFilePaths[0]
-      // TODO: 上传图片
-      formData.value.authImageUrl = tempFilePath
-      uni.showToast({ title: '图片上传功能开发中', icon: 'none' })
+      
+      uploading.value = true
+      try {
+        const uploadRes = await userApi.uploadAuthImage({ tempFilePath })
+        if (uploadRes.code === 200 && uploadRes.data) {
+          formData.value.authImageUrl = uploadRes.data.url
+          uni.showToast({ title: '上传成功', icon: 'success' })
+        }
+      } catch (error) {
+        console.error('上传失败', error)
+        uni.showToast({ title: '上传失败，请重试', icon: 'none' })
+      } finally {
+        uploading.value = false
+      }
     }
   })
 }

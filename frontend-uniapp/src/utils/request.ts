@@ -234,6 +234,47 @@ export const http = {
 
   delete<T = unknown>(url: string, data?: Record<string, unknown> | unknown[] | unknown, showLoading = false): Promise<Result<T>> {
     return request<T>({ url, method: 'DELETE', data, showLoading })
+  },
+
+  upload<T = unknown>(url: string, file: { file: any }, showLoading = false): Promise<Result<T>> {
+    return new Promise((resolve, reject) => {
+      const token = getToken()
+      const header: Record<string, string> = {}
+      if (token) {
+        header['Authorization'] = `Bearer ${token}`
+      }
+
+      uni.uploadFile({
+        url: `${BASE_URL}${url}`,
+        filePath: file.file.tempFilePath || file.file.path,
+        name: 'file',
+        header,
+        success: async (res) => {
+          if (showLoading) {
+            uni.hideLoading()
+          }
+
+          try {
+            const responseData = JSON.parse(res.data) as ResponseData
+            if (responseData.code === 200 || responseData.code === 0) {
+              resolve(responseData as Result<T>)
+            } else {
+              if (showLoading) showErrorToast(responseData.message)
+              reject(new Error(responseData.message))
+            }
+          } catch (e) {
+            reject(new Error('响应解析失败'))
+          }
+        },
+        fail: (err) => {
+          if (showLoading) {
+            uni.hideLoading()
+          }
+          showErrorToast('上传失败')
+          reject(err)
+        }
+      })
+    })
   }
 }
 

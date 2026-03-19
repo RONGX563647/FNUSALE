@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fnusale.admin.mapper.ProductAuditMapper;
 import com.fnusale.admin.mapper.ProductMapper;
 import com.fnusale.admin.mapper.UserMapper;
+import com.fnusale.admin.service.AdminEventPublisher;
 import com.fnusale.admin.service.AdminProductAuditService;
 import com.fnusale.admin.service.SystemLogService;
 import com.fnusale.common.common.PageResult;
@@ -16,6 +17,7 @@ import com.fnusale.common.enums.AuditResult;
 import com.fnusale.common.enums.LogModule;
 import com.fnusale.common.enums.OperateType;
 import com.fnusale.common.enums.ProductStatus;
+import com.fnusale.common.event.ProductAuditEvent;
 import com.fnusale.common.exception.BusinessException;
 import com.fnusale.common.vo.admin.AuditRecordVO;
 import com.fnusale.common.vo.admin.AuditStatisticsVO;
@@ -29,6 +31,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 商品审核服务实现
@@ -42,6 +45,7 @@ public class AdminProductAuditServiceImpl implements AdminProductAuditService {
     private final ProductAuditMapper productAuditMapper;
     private final UserMapper userMapper;
     private final SystemLogService systemLogService;
+    private final AdminEventPublisher eventPublisher;
 
     @Override
     public PageResult<PendingProductVO> getPendingList(Integer pageNum, Integer pageSize) {
@@ -80,6 +84,17 @@ public class AdminProductAuditServiceImpl implements AdminProductAuditService {
         systemLogService.log(adminId, LogModule.PRODUCT.getCode(), OperateType.UPDATE.getCode(),
                 "审核通过商品ID:" + productId, null, null);
 
+        // 发布审核通知事件
+        ProductAuditEvent event = ProductAuditEvent.builder()
+                .productId(productId)
+                .productName(product.getProductName())
+                .userId(product.getUserId())
+                .auditResult("PASS")
+                .auditTime(LocalDateTime.now())
+                .eventId(UUID.randomUUID().toString())
+                .build();
+        eventPublisher.publishProductAuditEvent(event);
+
         log.info("商品审核通过, productId: {}, adminId: {}", productId, adminId);
     }
 
@@ -113,6 +128,18 @@ public class AdminProductAuditServiceImpl implements AdminProductAuditService {
         // 记录日志
         systemLogService.log(adminId, LogModule.PRODUCT.getCode(), OperateType.UPDATE.getCode(),
                 "审核驳回商品ID:" + productId + ", 原因:" + reason, null, null);
+
+        // 发布审核通知事件
+        ProductAuditEvent event = ProductAuditEvent.builder()
+                .productId(productId)
+                .productName(product.getProductName())
+                .userId(product.getUserId())
+                .auditResult("REJECT")
+                .rejectReason(reason)
+                .auditTime(LocalDateTime.now())
+                .eventId(UUID.randomUUID().toString())
+                .build();
+        eventPublisher.publishProductAuditEvent(event);
 
         log.info("商品审核驳回, productId: {}, adminId: {}, reason: {}", productId, adminId, reason);
     }

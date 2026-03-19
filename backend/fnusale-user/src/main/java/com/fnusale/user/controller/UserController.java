@@ -4,15 +4,16 @@ import com.fnusale.common.common.PageResult;
 import com.fnusale.common.common.Result;
 import com.fnusale.common.dto.user.CaptchaDTO;
 import com.fnusale.common.dto.user.CaptchaLoginDTO;
+import com.fnusale.common.dto.user.PasswordUpdateDTO;
 import com.fnusale.common.dto.user.UserAuthDTO;
 import com.fnusale.common.dto.user.UserLoginDTO;
 import com.fnusale.common.dto.user.UserRegisterDTO;
 import com.fnusale.common.dto.user.UserUpdateDTO;
+import com.fnusale.common.util.UserContext;
 import com.fnusale.common.vo.user.LoginVO;
 import com.fnusale.common.vo.user.UserVO;
 import com.fnusale.user.service.CaptchaService;
 import com.fnusale.user.service.UserService;
-import com.fnusale.user.service.impl.UserServiceImpl;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -99,10 +100,8 @@ public class UserController {
 
     @Operation(summary = "修改密码", description = "修改当前用户密码")
     @PutMapping("/password")
-    public Result<Void> updatePassword(
-            @Parameter(description = "旧密码", required = true) @RequestParam String oldPassword,
-            @Parameter(description = "新密码", required = true) @RequestParam String newPassword) {
-        userService.updatePassword(oldPassword, newPassword);
+    public Result<Void> updatePassword(@Valid @RequestBody PasswordUpdateDTO dto) {
+        userService.updatePassword(dto.getOldPassword(), dto.getNewPassword());
         return Result.success("密码修改成功", null);
     }
 
@@ -151,7 +150,7 @@ public class UserController {
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer pageNum,
             @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") Integer pageSize) {
         // TODO: 需要从请求头获取当前用户ID
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         PageResult<Object> result = userService.getMyProducts(userId, pageNum, pageSize);
         return Result.success(result);
     }
@@ -162,7 +161,7 @@ public class UserController {
             @Parameter(description = "订单状态") @RequestParam(required = false) String status,
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer pageNum,
             @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") Integer pageSize) {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         PageResult<Object> result = userService.getMyOrders(userId, status, pageNum, pageSize);
         return Result.success(result);
     }
@@ -172,7 +171,7 @@ public class UserController {
     public Result<PageResult<Object>> getMyFavorites(
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer pageNum,
             @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") Integer pageSize) {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         PageResult<Object> result = userService.getMyFavorites(userId, pageNum, pageSize);
         return Result.success(result);
     }

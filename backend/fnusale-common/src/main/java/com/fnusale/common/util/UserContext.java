@@ -1,5 +1,7 @@
 package com.fnusale.common.util;
 
+import com.fnusale.common.exception.BusinessException;
+
 /**
  * 用户上下文工具类
  * 用于在当前线程中存储和获取用户信息
@@ -78,12 +80,12 @@ public class UserContext {
     }
 
     /**
-     * 获取当前用户ID，如果未登录则返回null
+     * 获取当前用户ID，如果未登录则抛出业务异常
      */
     public static Long getUserIdOrThrow() {
         Long userId = currentUserId.get();
         if (userId == null) {
-            throw new RuntimeException("用户未登录");
+            throw new BusinessException("用户未登录");
         }
         return userId;
     }

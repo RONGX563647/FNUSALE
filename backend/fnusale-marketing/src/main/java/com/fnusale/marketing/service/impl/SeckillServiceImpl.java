@@ -6,12 +6,15 @@ import com.fnusale.common.constant.MarketingConstants;
 import com.fnusale.common.dto.marketing.SeckillActivityDTO;
 import com.fnusale.common.entity.SeckillActivity;
 import com.fnusale.common.entity.SeckillReminder;
+import com.fnusale.common.event.SeckillOrderEvent;
+import com.fnusale.common.event.SeckillReminderEvent;
 import com.fnusale.common.exception.BusinessException;
 import com.fnusale.common.vo.marketing.SeckillActivityVO;
 import com.fnusale.common.vo.marketing.SeckillResultVO;
 import com.fnusale.common.vo.marketing.TodaySeckillVO;
 import com.fnusale.marketing.mapper.SeckillActivityMapper;
 import com.fnusale.marketing.mapper.SeckillReminderMapper;
+import com.fnusale.marketing.service.MarketingEventPublisher;
 import com.fnusale.marketing.service.SeckillService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,12 +23,14 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -39,6 +44,7 @@ public class SeckillServiceImpl implements SeckillService {
     private final SeckillActivityMapper activityMapper;
     private final SeckillReminderMapper reminderMapper;
     private final StringRedisTemplate redisTemplate;
+    private final MarketingEventPublisher eventPublisher;
 
     @Override
     public List<SeckillActivityVO> getSeckillList(Long userId) {
@@ -128,12 +134,22 @@ public class SeckillServiceImpl implements SeckillService {
             redisTemplate.expire(boughtKey, expireSeconds, TimeUnit.SECONDS);
         }
 
-        // TODO: 发送MQ消息异步创建订单
-        // 这里应该发送消息到RocketMQ，由消费者创建订单
-        // 临时返回一个模拟订单ID
-        Long orderId = System.currentTimeMillis();
+        // 发送 MQ 消息异步创建订单
+        SeckillOrderEvent orderEvent = SeckillOrderEvent.builder()
+                .userId(userId)
+                .activityId(activityId)
+                .productId(activity.getProductId())
+                .seckillPrice(activity.getSeckillPrice())
+                .quantity(1)
+                .eventId(UUID.randomUUID().toString())
+                .seckillTime(LocalDateTime.now())
+                .build();
+        eventPublisher.publishSeckillOrderEvent(orderEvent);
 
-        log.info("用户 {} 参与秒杀活动 {} 成功，订单ID: {}", userId, activityId, orderId);
+        // 返回排队中的状态，用户可轮询查询结果
+        Long orderId = null; // 订单正在创建中
+
+        log.info("用户 {} 参与秒杀活动 {} 成功，订单创建中", userId, activityId);
         return orderId;
     }
 
@@ -309,12 +325,23 @@ public class SeckillServiceImpl implements SeckillService {
             // 获取需要提醒的用户
             List<Long> userIds = reminderMapper.selectUserIdsByActivity(activity.getId());
             if (!userIds.isEmpty()) {
-                // TODO: 通过IM服务推送提醒消息
-                // 这里应该调用IM服务发送消息
-                log.info("推送秒杀提醒: 活动 {}, 用户数 {}", activity.getId(), userIds.size());
+                // 发送 MQ 消息异步推送提醒
+                SeckillReminderEvent reminderEvent = SeckillReminderEvent.builder()
+                        .activityId(activity.getId())
+                        .activityName(activity.getActivityName())
+                        .productId(activity.getProductId())
+                        .productName(null) // TODO: 查询商品名称
+                        .startTime(activity.getStartTime())
+                        .userIds(userIds)
+                        .eventId(UUID.randomUUID().toString())
+                        .remindTime(LocalDateTime.now())
+                        .build();
+                eventPublisher.publishSeckillReminderEvent(reminderEvent);
 
                 // 更新提醒状态
                 reminderMapper.updateReminded(activity.getId());
+
+                log.info("秒杀提醒消息已发送: 活动 {}, 用户数 {}", activity.getId(), userIds.size());
             }
         }
     }

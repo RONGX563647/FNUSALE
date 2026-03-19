@@ -36,6 +36,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useUserStore } from '@/stores/user'
+import { userApi } from '@/api/user'
 
 const userStore = useUserStore()
 
@@ -43,6 +44,8 @@ const formData = ref({
   username: '',
   birthday: ''
 })
+
+const uploading = ref(false)
 
 onMounted(() => {
   if (userStore.userInfo) {
@@ -56,10 +59,23 @@ const changeAvatar = () => {
     count: 1,
     sizeType: ['compressed'],
     sourceType: ['album', 'camera'],
-    success: (res) => {
+    success: async (res) => {
       const tempFilePath = res.tempFilePaths[0]
-      // TODO: 上传头像
-      uni.showToast({ title: '头像上传功能开发中', icon: 'none' })
+      
+      uploading.value = true
+      try {
+        const uploadRes = await userApi.uploadAvatar({ tempFilePath })
+        if (uploadRes.code === 200 && uploadRes.data) {
+          const avatarUrl = uploadRes.data.url
+          await userStore.updateUserInfo({ avatarUrl })
+          uni.showToast({ title: '头像更新成功', icon: 'success' })
+        }
+      } catch (error) {
+        console.error('上传失败', error)
+        uni.showToast({ title: '上传失败，请重试', icon: 'none' })
+      } finally {
+        uploading.value = false
+      }
     }
   })
 }

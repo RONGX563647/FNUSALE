@@ -1,7 +1,7 @@
 package com.fnusale.user.config;
 
 import com.fnusale.common.util.JwtUtil;
-import com.fnusale.user.service.impl.UserServiceImpl;
+import com.fnusale.common.util.UserContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
@@ -23,7 +23,11 @@ public class UserContextInterceptor implements HandlerInterceptor {
                 if (JwtUtil.validateToken(token)) {
                     Long userId = JwtUtil.getUserId(token);
                     if (userId != null) {
-                        UserServiceImpl.setCurrentUserId(userId);
+                        UserContext.setCurrentUserId(userId);
+                        String identityType = JwtUtil.getIdentityType(token);
+                        if (identityType != null) {
+                            UserContext.setCurrentUserRole(identityType);
+                        }
                     }
                 }
             } catch (Exception e) {
@@ -35,6 +39,6 @@ public class UserContextInterceptor implements HandlerInterceptor {
 
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
-        UserServiceImpl.clearCurrentUserId();
+        UserContext.clear();
     }
 }

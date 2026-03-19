@@ -2,11 +2,11 @@ package com.fnusale.user.controller;
 
 import com.fnusale.common.common.PageResult;
 import com.fnusale.common.common.Result;
+import com.fnusale.common.util.UserContext;
 import com.fnusale.common.vo.user.MyRankingVO;
 import com.fnusale.common.vo.user.RankingRewardVO;
 import com.fnusale.common.vo.user.RankingUserVO;
 import com.fnusale.user.service.RankingService;
-import com.fnusale.user.service.impl.UserServiceImpl;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -62,7 +62,7 @@ public class RankingController {
     @Operation(summary = "我的排名", description = "获取当前用户在各榜单的排名和得分")
     @GetMapping("/my")
     public Result<MyRankingVO> getMyRanking() {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         MyRankingVO vo = rankingService.getMyRanking(userId);
         return Result.success(vo);
     }
@@ -73,7 +73,7 @@ public class RankingController {
             @Parameter(description = "排行类型：ACTIVITY-活跃度，TRADE-交易，CREDIT-信誉，RATING-好评", required = true) @RequestParam String rankType,
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer pageNum,
             @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") Integer pageSize) {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         PageResult<RankingUserVO> result = rankingService.getRankingHistory(userId, rankType, pageNum, pageSize);
         return Result.success(result);
     }
@@ -82,7 +82,7 @@ public class RankingController {
     @PostMapping("/reward/{id}")
     public Result<Void> claimReward(
             @Parameter(description = "奖励ID", required = true) @PathVariable Long id) {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         rankingService.claimReward(userId, id);
         return Result.success("领取成功", null);
     }
@@ -91,7 +91,7 @@ public class RankingController {
     @GetMapping("/rewards")
     public Result<List<RankingRewardVO>> getMyRewards(
             @Parameter(description = "是否已领取") @RequestParam(required = false) Boolean isClaimed) {
-        Long userId = UserServiceImpl.getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         List<RankingRewardVO> list = rankingService.getMyRewards(userId, isClaimed);
         return Result.success(list);
     }

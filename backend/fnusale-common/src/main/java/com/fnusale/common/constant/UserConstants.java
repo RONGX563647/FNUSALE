@@ -74,6 +74,37 @@ public class UserConstants {
     public static final int REPAIR_SIGN_MAX_MONTHLY = 3;
 
     /**
+     * 身份类型常量
+     */
+    public static final String IDENTITY_TYPE_STUDENT = "STUDENT";
+    public static final String IDENTITY_TYPE_TEACHER = "TEACHER";
+
+    /**
+     * 定位权限常量
+     */
+    public static final String LOCATION_PERMISSION_ALLOW = "ALLOW";
+    public static final String LOCATION_PERMISSION_DENY = "DENY";
+
+    /**
+     * 认证状态常量
+     */
+    public static final String AUTH_STATUS_UNAUTH = "UNAUTH";
+    public static final String AUTH_STATUS_UNDER_REVIEW = "UNDER_REVIEW";
+    public static final String AUTH_STATUS_SUCCESS = "AUTH_SUCCESS";
+
+    /**
+     * 登录失败限制
+     */
+    public static final int MAX_LOGIN_ATTEMPTS = 5;
+    public static final long LOGIN_LOCK_TIME_MINUTES = 15;
+
+    /**
+     * 接口限流配置
+     */
+    public static final int CAPTCHA_SEND_LIMIT_PER_DAY = 10;
+    public static final int LOGIN_LIMIT_PER_MINUTE = 5;
+
+    /**
      * 密码最小长度
      */
     public static final int PASSWORD_MIN_LENGTH = 6;
