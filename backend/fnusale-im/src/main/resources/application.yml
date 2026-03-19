@@ -27,6 +27,9 @@ spring:
         enabled: ${NACOS_ENABLED:true}
         import-check:
           enabled: false
+    openfeign:
+      circuitbreaker:
+        enabled: true
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3307}/${MYSQL_DATABASE:fnusale}?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
