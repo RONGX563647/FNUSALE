@@ -8,6 +8,9 @@ import com.fnusale.common.dto.user.UserUpdateDTO;
 import com.fnusale.common.vo.user.LoginVO;
 import com.fnusale.common.vo.user.UserVO;
 
+import java.util.List;
+import java.util.Map;
+
 /**
  * 用户服务接口
  */
@@ -92,4 +95,18 @@ public interface UserService {
      * 获取我的收藏列表
      */
     PageResult<Object> getMyFavorites(Long userId, Integer pageNum, Integer pageSize);
+
+    /**
+     * 批量获取用户信息
+     * @param userIds 用户ID列表
+     * @return 用户ID -> UserVO映射
+     */
+    Map<Long, UserVO> getUsersByIds(List<Long> userIds);
+
+    /**
+     * 批量获取用户认证状态
+     * @param userIds 用户ID列表
+     * @return 用户ID -> 认证状态映射
+     */
+    Map<Long, String> getAuthStatusByIds(List<Long> userIds);
 }

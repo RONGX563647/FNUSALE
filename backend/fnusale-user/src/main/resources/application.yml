@@ -115,6 +115,14 @@ aliyun:
     bucket-name: rongxpicture
     domain: ${OSS_DOMAIN:}
 
+# 高德地图API配置
+amap:
+  key: ${AMAP_KEY:your-amap-key}
+  base-url: https://restapi.amap.com/v3
+  connect-timeout: 5000
+  read-timeout: 10000
+  enabled: ${AMAP_ENABLED:true}
+
 # 校园围栏配置（示例：福州大学旗山校区）
 campus:
   fence:

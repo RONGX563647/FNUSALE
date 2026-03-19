@@ -16,9 +16,10 @@ public interface RankingService {
      * 获取活跃度排行榜
      * @param type 排行类型：daily-日榜，weekly-周榜，monthly-月榜
      * @param date 日期，格式：yyyy-MM-dd
+     * @param limit 返回数量限制
      * @return 排行榜列表
      */
-    List<RankingUserVO> getActivityRanking(String type, String date);
+    List<RankingUserVO> getActivityRanking(String type, String date, Integer limit);
 
     /**
      * 获取交易排行榜

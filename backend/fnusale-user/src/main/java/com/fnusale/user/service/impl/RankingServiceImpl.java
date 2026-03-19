@@ -39,9 +39,10 @@ public class RankingServiceImpl implements RankingService {
     private static final int REWARD_TOP_N = 10; // 前N名有奖励
 
     @Override
-    public List<RankingUserVO> getActivityRanking(String type, String date) {
+    public List<RankingUserVO> getActivityRanking(String type, String date, Integer limit) {
         String period = convertTypeToPeriod(type);
-        return rankingCacheService.getTopN("ACTIVITY", period, RANKING_LIMIT);
+        int actualLimit = (limit != null && limit > 0) ? limit : RANKING_LIMIT;
+        return rankingCacheService.getTopN("ACTIVITY", period, actualLimit);
     }
 
     @Override

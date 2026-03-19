@@ -31,8 +31,9 @@ public class RankingController {
     @GetMapping("/activity")
     public Result<List<RankingUserVO>> getActivityRanking(
             @Parameter(description = "排行类型：daily-日榜，weekly-周榜，monthly-月榜") @RequestParam(defaultValue = "daily") String type,
-            @Parameter(description = "日期，格式：yyyy-MM-dd") @RequestParam(required = false) String date) {
-        List<RankingUserVO> list = rankingService.getActivityRanking(type, date);
+            @Parameter(description = "日期，格式：yyyy-MM-dd") @RequestParam(required = false) String date,
+            @Parameter(description = "返回数量限制，默认100") @RequestParam(defaultValue = "100") Integer limit) {
+        List<RankingUserVO> list = rankingService.getActivityRanking(type, date, limit);
         return Result.success(list);
     }
 

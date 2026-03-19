@@ -17,9 +17,15 @@ public interface CampusPickPointService {
     List<CampusPickPointVO> getList();
 
     /**
-     * 获取附近自提点
+     * 获取附近自提点（支持IP定位）
+     *
+     * @param longitude 经度（可选）
+     * @param latitude  纬度（可选）
+     * @param distance  距离范围（米）
+     * @param ip        用户IP地址
+     * @return 按距离排序的自提点列表
      */
-    List<CampusPickPointVO> getNearby(String longitude, String latitude, Integer distance);
+    List<CampusPickPointVO> getNearby(String longitude, String latitude, Integer distance, String ip);
 
     /**
      * 获取自提点详情

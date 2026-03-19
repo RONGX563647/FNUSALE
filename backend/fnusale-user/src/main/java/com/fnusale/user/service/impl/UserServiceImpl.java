@@ -41,9 +41,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -504,6 +507,28 @@ public class UserServiceImpl implements UserService {
     @Override
     public PageResult<Object> getMyFavorites(Long userId, Integer pageNum, Integer pageSize) {
         return new PageResult<>(pageNum, pageSize, 0, Collections.emptyList());
+    }
+
+    @Override
+    public Map<Long, UserVO> getUsersByIds(List<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        List<User> users = userMapper.selectBatchIds(userIds);
+        return users.stream()
+                .collect(Collectors.toMap(User::getId, this::buildUserVO, (v1, v2) -> v1));
+    }
+
+    @Override
+    public Map<Long, String> getAuthStatusByIds(List<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        List<User> users = userMapper.selectBatchIds(userIds);
+        return users.stream()
+                .collect(Collectors.toMap(User::getId, User::getAuthStatus, (v1, v2) -> v1));
     }
 
     private void initUserPoints(Long userId) {

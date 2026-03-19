@@ -8,6 +8,7 @@ import com.fnusale.user.service.CampusPickPointService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -16,9 +17,9 @@ import java.util.List;
 
 /**
  * 校园自提点控制器
- * 提供校园自提点的增删改查接口
+ * 提供校园自提点的增删改查接口，支持IP定位和经纬度定位
  */
-@Tag(name = "校园自提点管理", description = "校园自提点的增删改查接口，支持附近查询")
+@Tag(name = "校园自提点管理", description = "校园自提点的增删改查接口，支持IP定位和经纬度定位")
 @RestController
 @RequestMapping("/user/pick-point")
 @RequiredArgsConstructor
@@ -33,13 +34,15 @@ public class CampusPickPointController {
         return Result.success(list);
     }
 
-    @Operation(summary = "获取附近自提点", description = "根据定位获取附近的校园自提点，按距离排序")
+    @Operation(summary = "获取附近自提点", description = "根据定位获取附近的校园自提点，按距离排序。支持IP定位（无需传经纬度）或前端GPS定位（传经纬度）")
     @GetMapping("/nearby")
     public Result<List<CampusPickPointVO>> getNearby(
-            @Parameter(description = "经度", required = true) @RequestParam String longitude,
-            @Parameter(description = "纬度", required = true) @RequestParam String latitude,
-            @Parameter(description = "距离范围(米)，默认1000米") @RequestParam(defaultValue = "1000") Integer distance) {
-        List<CampusPickPointVO> list = campusPickPointService.getNearby(longitude, latitude, distance);
+            @Parameter(description = "经度（可选，不传则使用IP定位）") @RequestParam(required = false) String longitude,
+            @Parameter(description = "纬度（可选，不传则使用IP定位）") @RequestParam(required = false) String latitude,
+            @Parameter(description = "距离范围(米)，默认1000米") @RequestParam(defaultValue = "1000") Integer distance,
+            HttpServletRequest request) {
+        String ip = getClientIp(request);
+        List<CampusPickPointVO> list = campusPickPointService.getNearby(longitude, latitude, distance, ip);
         return Result.success(list);
     }
 
@@ -94,5 +97,31 @@ public class CampusPickPointController {
             @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") Integer pageSize) {
         PageResult<CampusPickPointVO> result = campusPickPointService.getPage(campusArea, status, pageNum, pageSize);
         return Result.success(result);
+    }
+
+    /**
+     * 获取客户端真实IP
+     */
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("Proxy-Client-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("WL-Proxy-Client-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("HTTP_CLIENT_IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("HTTP_X_FORWARDED_FOR");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 }
