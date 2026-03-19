@@ -7,7 +7,7 @@ export interface Result<T = unknown> {
 
 // 分页结果
 export interface PageResult<T = unknown> {
-  list: T[]
+  records: T[]
   total: number
   pageNum: number
   pageSize: number

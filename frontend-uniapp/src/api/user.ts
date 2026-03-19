@@ -58,6 +58,16 @@ export const userApi = {
     return http.post('/user/login', { email, password, loginType: 'EMAIL' })
   },
 
+  // 验证码登录
+  loginByCaptcha(account: string, captcha: string): Promise<Result<LoginVO>> {
+    return http.post('/user/login/captcha', { account, captcha })
+  },
+
+  // 发送验证码
+  sendCaptcha(account: string, type: string = 'LOGIN'): Promise<Result<void>> {
+    return http.post('/user/captcha/send', { account, type })
+  },
+
   // 用户登出
   logout(): Promise<Result<void>> {
     return http.post('/user/logout')
@@ -106,6 +116,45 @@ export const userApi = {
   // 校验定位是否在校园内
   verifyLocation(longitude: string, latitude: string): Promise<Result<boolean>> {
     return http.get('/user/location/verify', { longitude, latitude })
+  },
+
+  // IP定位
+  getLocationByIp(): Promise<Result<{
+    longitude: string
+    latitude: string
+    province: string
+    city: string
+    district: string
+    address: string
+    inCampus: boolean
+  }>> {
+    return http.get('/user/location/ip')
+  },
+
+  // 逆地理编码
+  geocodeLocation(longitude: string, latitude: string): Promise<Result<{
+    longitude: string
+    latitude: string
+    province: string
+    city: string
+    district: string
+    address: string
+    inCampus: boolean
+  }>> {
+    return http.get('/user/location/geocode', { longitude, latitude })
+  },
+
+  // 综合定位
+  getCurrentLocation(longitude?: string, latitude?: string): Promise<Result<{
+    longitude: string
+    latitude: string
+    province: string
+    city: string
+    district: string
+    address: string
+    inCampus: boolean
+  }>> {
+    return http.get('/user/location/current', { longitude, latitude })
   },
 
   // 获取我的发布列表
@@ -243,6 +292,19 @@ export const pointsApi = {
   // 获取我的积分
   getMyPoints(): Promise<Result<UserPointsVO>> {
     return http.get('/user/sign/points')
+  },
+
+  // 获取积分变动记录
+  getPointsLogs(params: PageParams & { changeType?: string }): Promise<Result<PageResult<{
+    id: number
+    changeType: string
+    changeAmount: number
+    beforePoints: number
+    afterPoints: number
+    remark: string
+    createTime: string
+  }>>> {
+    return http.get('/user/sign/points/logs', params)
   }
 }
 
@@ -292,8 +354,8 @@ export const evaluationApi = {
 // 排行榜 API
 export const rankingApi = {
   // 活跃度排行榜
-  getActivity(type: string = 'daily', date?: string): Promise<Result<RankingUserVO[]>> {
-    return http.get('/rank/activity', { type, date })
+  getActivity(type: string = 'daily', date?: string, limit: number = 100): Promise<Result<RankingUserVO[]>> {
+    return http.get('/rank/activity', { type, date, limit })
   },
 
   // 交易排行榜
