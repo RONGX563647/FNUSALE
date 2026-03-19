@@ -93,6 +93,16 @@ export const productApi = {
   // 获取草稿列表
   getDraftList(params: PageParams): Promise<Result<PageResult<ProductVO>>> {
     return http.get(`${BASE_URL}/draft/list`, params)
+  },
+
+  // 根据ID获取商品信息（内部接口）
+  getInnerById(productId: number): Promise<Result<ProductVO>> {
+    return http.get(`${BASE_URL}/inner/${productId}`)
+  },
+
+  // 批量获取商品信息（内部接口）
+  getInnerBatch(productIds: number[]): Promise<Result<Record<string, ProductVO>>> {
+    return http.post(`${BASE_URL}/inner/batch`, productIds)
   }
 }
 

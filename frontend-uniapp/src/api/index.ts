@@ -16,5 +16,13 @@ export { sessionApi, messageApi } from './im'
 // 营销相关 API
 export { couponApi, seckillApi } from './marketing'
 
-// 管理后台 API
-export { adminAuditApi, adminUserApi, adminStatisticsApi, systemConfigApi } from './admin'
+// 管理模块相关 API
+export { 
+  adminAuditApi, 
+  adminUserApi, 
+  adminStatisticsApi, 
+  systemConfigApi,
+  adminDisputeApi,
+  systemLogApi,
+  adminAuthApi
+} from './admin'

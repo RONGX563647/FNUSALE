@@ -4,36 +4,50 @@
 export interface ImSessionVO {
   id: number
   targetUserId: number
-  targetUserName: string
-  targetUserAvatar: string
+  targetUsername: string
+  targetAvatarUrl?: string
   productId: number
-  productTitle: string
-  productImage: string
-  lastMessage: string
+  productName: string
+  productMainImage?: string
+  productPrice?: number
+  lastMessageContent: string
   lastMessageTime: string
   unreadCount: number
-  isPinned: boolean
+  sessionStatus: string
+  isPinned?: boolean
 }
 
 // 聊天消息
 export interface ImMessageVO {
   id: number
+  messageId: number
   sessionId: number
   senderId: number
-  senderName: string
-  senderAvatar: string
-  type: string // TEXT/IMAGE/VOICE
+  receiverId: number
+  messageType: string // TEXT/IMAGE/VOICE
   content: string
-  imageUrl: string
-  voiceUrl: string
-  voiceDuration: number
-  status: string // SENDING/SENT/READ/RECALLED
-  createTime: string
+  messageContent: string
+  isRead: number
+  sendTime: string
+  duration?: number
+  isRecalled?: number
 }
 
-// 快捷回复
-export interface QuickReplyVO {
+// 快捷回复项
+export interface QuickReplyItem {
   id: number
-  content: string
-  isSystem: boolean
+  replyContent: string
+  sort: number
+}
+
+// 快捷回复列表
+export interface QuickReplyListVO {
+  systemReplies: QuickReplyItem[]
+  userReplies: QuickReplyItem[]
+}
+
+// 发送消息响应
+export interface SendMessageResult {
+  messageId: number
+  sendTime: string
 }

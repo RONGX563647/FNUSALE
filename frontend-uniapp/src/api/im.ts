@@ -1,6 +1,6 @@
 import { http } from '@/utils/request'
 import type { Result, PageResult, PageParams } from '@/types/common'
-import type { ImSessionVO, ImMessageVO, QuickReplyVO } from '@/types/im'
+import type { ImSessionVO, ImMessageVO, QuickReplyListVO, SendMessageResult } from '@/types/im'
 
 // 聊天会话 API
 export const sessionApi = {
@@ -15,12 +15,12 @@ export const sessionApi = {
   },
 
   // 创建会话
-  create(targetUserId: number, productId: number): Promise<Result<number>> {
+  create(targetUserId: number, productId: number): Promise<Result<{ sessionId: number }>> {
     return http.post('/session/create', { targetUserId, productId })
   },
 
   // 获取或创建会话
-  getOrCreate(targetUserId: number, productId: number): Promise<Result<number>> {
+  getOrCreate(targetUserId: number, productId: number): Promise<Result<{ sessionId: number }>> {
     return http.get('/session/get-or-create', { targetUserId, productId })
   },
 
@@ -58,17 +58,17 @@ export const sessionApi = {
 // 聊天消息 API
 export const messageApi = {
   // 发送文字消息
-  sendText(sessionId: number, content: string): Promise<Result<void>> {
+  sendText(sessionId: number, content: string): Promise<Result<SendMessageResult>> {
     return http.post('/message/text', { sessionId, content })
   },
 
   // 发送图片消息
-  sendImage(sessionId: number, imageUrl: string): Promise<Result<void>> {
+  sendImage(sessionId: number, imageUrl: string): Promise<Result<SendMessageResult>> {
     return http.post('/message/image', { sessionId, imageUrl })
   },
 
   // 发送语音消息
-  sendVoice(sessionId: number, voiceUrl: string, duration: number): Promise<Result<void>> {
+  sendVoice(sessionId: number, voiceUrl: string, duration: number): Promise<Result<SendMessageResult>> {
     return http.post('/message/voice', { sessionId, voiceUrl, duration })
   },
 
@@ -78,7 +78,7 @@ export const messageApi = {
   },
 
   // 获取快捷回复列表
-  getQuickReplyList(): Promise<Result<QuickReplyVO[]>> {
+  getQuickReplyList(): Promise<Result<QuickReplyListVO>> {
     return http.get('/message/quick-reply/list')
   },
 
@@ -98,7 +98,7 @@ export const messageApi = {
   },
 
   // 搜索消息
-  search(sessionId: number, keyword: string): Promise<Result<unknown>> {
+  search(sessionId: number, keyword: string): Promise<Result<ImMessageVO[]>> {
     return http.get('/message/search', { sessionId, keyword })
   }
 }
