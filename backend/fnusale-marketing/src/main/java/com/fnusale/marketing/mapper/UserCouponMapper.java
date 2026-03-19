@@ -69,4 +69,20 @@ public interface UserCouponMapper extends BaseMapper<UserCoupon> {
             "WHERE uc.coupon_id = #{couponId} " +
             "ORDER BY uc.receive_time DESC")
     IPage<UserCoupon> selectUserCouponPage(Page<UserCoupon> page, @Param("couponId") Long couponId);
+
+    /**
+     * 查询即将过期的优惠券（3天内过期且未使用）
+     */
+    @Select("SELECT uc.id as id, uc.user_id, uc.coupon_id, c.coupon_name, c.reduce_amount, uc.expire_time " +
+            "FROM t_user_coupon uc " +
+            "INNER JOIN t_coupon c ON uc.coupon_id = c.id " +
+            "WHERE uc.coupon_status = 'UNUSED' " +
+            "AND uc.expire_time > NOW() " +
+            "AND uc.expire_time <= DATE_ADD(NOW(), INTERVAL #{days} DAY) " +
+            "AND NOT EXISTS (" +
+            "  SELECT 1 FROM t_coupon_expire_reminder r " +
+            "  WHERE r.user_coupon_id = uc.id AND r.remind_date = CURDATE()" +
+            ") " +
+            "ORDER BY uc.expire_time ASC")
+    List<UserCoupon> selectExpiringSoon(@Param("days") int days);
 }

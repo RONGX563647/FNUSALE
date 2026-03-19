@@ -69,6 +69,18 @@
             <version>2.2.3</version>
         </dependency>
 
+        <!-- Micrometer Prometheus - 消息监控 -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <!-- Actuator - 健康检查与指标暴露 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <!-- OpenFeign -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
