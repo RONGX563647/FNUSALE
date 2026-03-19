@@ -11,3 +11,8 @@ node_modules/
 # ==================== 操作系统 ====================
 .DS_Store
 Thumbs.db
+
+# ==================== Nacos ====================
+backend/nacos/nacos/logPath_IS_UNDEFINED/
+backend/nacos/nacos/data/derby-data/db.lck
+*.log

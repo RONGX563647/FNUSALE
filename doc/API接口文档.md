@@ -20,6 +20,14 @@ Authorization: Bearer {accessToken}
 
 ### 通用响应格式
 
+**说明**: 所有接口统一返回 `Result<T>` 格式的响应数据，包含以下字段：
+
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| code | Integer | 状态码，200表示成功，其他表示失败 |
+| message | String | 响应消息，成功时为"操作成功"，失败时为错误描述 |
+| data | T | 响应数据，成功时返回业务数据，失败时为null |
+
 #### 成功响应
 ```json
 {
@@ -29,6 +37,11 @@ Authorization: Bearer {accessToken}
 }
 ```
 
+**说明**: 
+- `code` 固定为 200
+- `message` 通常为"操作成功"或具体操作的成功提示（如"发布成功"、"删除成功"等）
+- `data` 包含实际业务数据，可能是对象、数组或基本类型
+
 #### 失败响应
 ```json
 {
@@ -37,6 +50,11 @@ Authorization: Bearer {accessToken}
   "data": null
 }
 ```
+
+**说明**:
+- `code` 为非200的错误码，具体见错误码说明
+- `message` 包含具体的错误描述信息
+- `data` 失败时固定为 null
 
 #### 分页响应
 ```json
@@ -52,6 +70,13 @@ Authorization: Bearer {accessToken}
   }
 }
 ```
+
+**说明**:
+- `total`: 总记录数
+- `pageNum`: 当前页码
+- `pageSize`: 每页数量
+- `pages`: 总页数
+- `list`: 当前页数据列表
 
 ### 状态码说明
 | 状态码 | 说明 |
@@ -663,6 +688,42 @@ Authorization: Bearer {accessToken}
 
 ---
 
+### 1.17.1 签到统计
+
+**接口地址**: `GET /user/sign/statistics`
+
+**接口描述**: 获取签到统计信息，包括连续签到天数、累计签到天数、下次奖励等
+
+**请求头**: 需要认证
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "hasSignedToday": true,
+    "continuousDays": 5,
+    "totalSignDays": 30,
+    "todayRewardPoints": 1,
+    "nextRewardDays": 7,
+    "nextRewardPoints": 10,
+    "totalPoints": 156
+  }
+}
+```
+
+**说明**:
+- `hasSignedToday`: 今日是否已签到
+- `continuousDays`: 连续签到天数
+- `totalSignDays`: 累计签到天数
+- `todayRewardPoints`: 今日签到获得积分
+- `nextRewardDays`: 距离下次连续签到奖励还需天数
+- `nextRewardPoints`: 下次连续签到奖励积分
+- `totalPoints`: 当前总积分
+
+---
+
 ### 1.18 获取签到记录
 
 **接口地址**: `GET /user/sign/records`
@@ -960,6 +1021,50 @@ Authorization: Bearer {accessToken}
 
 ---
 
+### 1.26.1 获取我的评价
+
+**接口地址**: `GET /user/evaluation/my`
+
+**接口描述**: 获取当前用户发出的评价列表
+
+**请求头**: 需要认证
+
+**请求参数**:
+| 参数名 | 类型 | 必填 | 默认值 | 说明 |
+|--------|------|------|--------|------|
+| pageNum | Integer | 否 | 1 | 页码 |
+| pageSize | Integer | 否 | 10 | 每页数量 |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "total": 15,
+    "list": [
+      {
+        "id": 1,
+        "orderId": 1001,
+        "evaluatedName": "张**",
+        "score": 5,
+        "evaluationTag": "发货快,成色相符",
+        "evaluationContent": "商品很好，卖家很热情",
+        "createTime": "2024-01-15 10:00:00",
+        "isAnonymous": false
+      }
+    ]
+  }
+}
+```
+
+**说明**:
+- 该接口返回当前用户发出的所有评价
+- `evaluatedName`: 被评价用户的脱敏名称
+- `isAnonymous`: 是否匿名评价
+
+---
+
 ### 1.27 获取用户评价统计
 
 **接口地址**: `GET /user/evaluation/rating/{userId}`
@@ -1058,7 +1163,8 @@ Authorization: Bearer {accessToken}
 | 参数名 | 类型 | 必填 | 默认值 | 说明 |
 |--------|------|------|--------|------|
 | type | String | 否 | daily | 排行类型：daily-日榜，weekly-周榜，monthly-月榜 |
-| limit | Integer | 否 | 100 | 返回数量 |
+| date | String | 否 | - | 日期，格式：yyyy-MM-dd（不传则查询当前日期） |
+| limit | Integer | 否 | 100 | 返回数量限制 |
 
 **响应示例**:
 ```json
@@ -1308,11 +1414,117 @@ Authorization: Bearer {accessToken}
 
 ---
 
+### 1.38 IP定位
+
+**接口地址**: `GET /user/location/ip`
+
+**接口描述**: 根据用户IP地址获取大致位置信息
+
+**请求头**: 无需认证
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "longitude": "116.407526",
+    "latitude": "39.904030",
+    "province": "北京市",
+    "city": "北京市",
+    "district": "海淀区",
+    "address": "北京市海淀区",
+    "inCampus": true
+  }
+}
+```
+
+**说明**: 
+- 该接口通过用户IP地址进行定位，精度较低，建议优先使用前端GPS定位
+- `inCampus`字段表示是否在校园围栏内
+
+---
+
+### 1.39 逆地理编码
+
+**接口地址**: `GET /user/location/geocode`
+
+**接口描述**: 将经纬度坐标转换为详细地址
+
+**请求头**: 无需认证
+
+**请求参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| longitude | String | 是 | 经度 |
+| latitude | String | 是 | 纬度 |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "longitude": "116.407526",
+    "latitude": "39.904030",
+    "province": "北京市",
+    "city": "北京市",
+    "district": "海淀区",
+    "address": "北京市海淀区中关村大街1号",
+    "inCampus": true
+  }
+}
+```
+
+**说明**: 
+- 该接口将经纬度坐标转换为详细地址信息
+- `inCampus`字段表示该坐标是否在校园围栏内
+
+---
+
+### 1.40 综合定位
+
+**接口地址**: `GET /user/location/current`
+
+**接口描述**: 优先使用前端传递的经纬度，否则使用IP定位
+
+**请求头**: 无需认证
+
+**请求参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| longitude | String | 否 | 经度（可选，不传则使用IP定位） |
+| latitude | String | 否 | 纬度（可选，不传则使用IP定位） |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "longitude": "116.407526",
+    "latitude": "39.904030",
+    "province": "北京市",
+    "city": "北京市",
+    "district": "海淀区",
+    "address": "北京市海淀区中关村大街1号",
+    "inCampus": true
+  }
+}
+```
+
+**说明**: 
+- 如果前端传递了经纬度参数，则使用经纬度进行逆地理编码
+- 如果未传递经纬度参数，则使用IP地址进行定位
+- 建议前端优先获取GPS定位后传递经纬度参数，定位更准确
+
+---
+
 ## 二、用户地址模块 API
 
 ### 2.1 获取我的地址列表
 
-**接口地址**: `GET /address/list`
+**接口地址**: `GET /user/address/list`
 
 **接口描述**: 获取当前用户的所有地址
 
@@ -1338,7 +1550,7 @@ Authorization: Bearer {accessToken}
 
 ### 2.2 获取地址详情
 
-**接口地址**: `GET /address/{id}`
+**接口地址**: `GET /user/address/{id}`
 
 **接口描述**: 根据ID获取地址详细信息
 
@@ -1368,7 +1580,7 @@ Authorization: Bearer {accessToken}
 
 ### 2.3 新增地址
 
-**接口地址**: `POST /address`
+**接口地址**: `POST /user/address`
 
 **接口描述**: 添加新地址
 
@@ -1408,7 +1620,7 @@ Authorization: Bearer {accessToken}
 
 ### 2.4 更新地址
 
-**接口地址**: `PUT /address/{id}`
+**接口地址**: `PUT /user/address/{id}`
 
 **接口描述**: 更新地址信息
 
@@ -1434,7 +1646,7 @@ Authorization: Bearer {accessToken}
 
 ### 2.5 删除地址
 
-**接口地址**: `DELETE /address/{id}`
+**接口地址**: `DELETE /user/address/{id}`
 
 **接口描述**: 删除地址
 
@@ -1458,7 +1670,7 @@ Authorization: Bearer {accessToken}
 
 ### 2.6 设置默认地址
 
-**接口地址**: `PUT /address/{id}/default`
+**接口地址**: `PUT /user/address/{id}/default`
 
 **接口描述**: 设置指定地址为默认地址
 
@@ -1482,7 +1694,7 @@ Authorization: Bearer {accessToken}
 
 ### 2.7 获取默认地址
 
-**接口地址**: `GET /address/default`
+**接口地址**: `GET /user/address/default`
 
 **接口描述**: 获取当前用户的默认地址
 
@@ -1508,7 +1720,7 @@ Authorization: Bearer {accessToken}
 
 ### 3.1 获取自提点列表
 
-**接口地址**: `GET /pick-point/list`
+**接口地址**: `GET /user/pick-point/list`
 
 **接口描述**: 获取所有启用的校园自提点列表
 
@@ -1534,7 +1746,7 @@ Authorization: Bearer {accessToken}
 
 ### 3.2 获取附近自提点
 
-**接口地址**: `GET /pick-point/nearby`
+**接口地址**: `GET /user/pick-point/nearby`
 
 **接口描述**: 根据定位获取附近的校园自提点
 
@@ -1564,7 +1776,7 @@ Authorization: Bearer {accessToken}
 
 ### 3.3 获取自提点详情
 
-**接口地址**: `GET /pick-point/{id}`
+**接口地址**: `GET /user/pick-point/{id}`
 
 **接口描述**: 根据ID获取自提点详细信息
 
@@ -1594,7 +1806,7 @@ Authorization: Bearer {accessToken}
 
 ### 3.4 新增自提点（管理员）
 
-**接口地址**: `POST /pick-point`
+**接口地址**: `POST /user/pick-point`
 
 **接口描述**: 添加新的校园自提点
 
@@ -1624,7 +1836,7 @@ Authorization: Bearer {accessToken}
 
 ### 3.5 更新自提点（管理员）
 
-**接口地址**: `PUT /pick-point/{id}`
+**接口地址**: `PUT /user/pick-point/{id}`
 
 **接口描述**: 更新自提点信息
 
@@ -1650,7 +1862,7 @@ Authorization: Bearer {accessToken}
 
 ### 3.6 删除自提点（管理员）
 
-**接口地址**: `DELETE /pick-point/{id}`
+**接口地址**: `DELETE /user/pick-point/{id}`
 
 **接口描述**: 删除自提点
 
@@ -1674,7 +1886,7 @@ Authorization: Bearer {accessToken}
 
 ### 3.7 启用/禁用自提点（管理员）
 
-**接口地址**: `PUT /pick-point/{id}/status`
+**接口地址**: `PUT /user/pick-point/{id}/status`
 
 **接口描述**: 切换自提点启用状态
 
@@ -1703,7 +1915,7 @@ Authorization: Bearer {accessToken}
 
 ### 3.8 分页查询自提点（管理员）
 
-**接口地址**: `GET /pick-point/page`
+**接口地址**: `GET /user/pick-point/page`
 
 **接口描述**: 分页查询自提点列表
 
@@ -2240,6 +2452,77 @@ Authorization: Bearer {accessToken}
 
 ---
 
+### 4.18 内部接口说明
+
+**说明**: 以下接口为内部接口，仅供其他微服务调用，不对外开放。
+
+#### 4.18.1 根据ID获取商品信息
+
+**接口地址**: `GET /product/inner/{productId}`
+
+**接口描述**: 供其他服务调用，获取商品详细信息
+
+**权限**: 内部服务调用
+
+**路径参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| productId | Long | 是 | 商品ID |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "id": 1001,
+    "productName": "大学物理教材",
+    "categoryId": 1,
+    "categoryName": "教材",
+    "price": 35.00,
+    "productStatus": "ON_SHELF",
+    "userId": 1
+  }
+}
+```
+
+---
+
+#### 4.18.2 批量获取商品信息
+
+**接口地址**: `POST /product/inner/batch`
+
+**接口描述**: 供其他服务调用，批量获取商品信息
+
+**权限**: 内部服务调用
+
+**请求参数**:
+```json
+[1001, 1002, 1003]
+```
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "1001": {
+      "id": 1001,
+      "productName": "大学物理教材",
+      "price": 35.00
+    },
+    "1002": {
+      "id": 1002,
+      "productName": "高等数学教材",
+      "price": 30.00
+    }
+  }
+}
+```
+
+---
+
 ## 五、商品品类模块 API
 
 ### 5.1 获取品类树
@@ -2570,7 +2853,9 @@ Authorization: Bearer {accessToken}
 {
   "code": 200,
   "message": "创建成功",
-  "data": 1
+  "data": {
+    "sessionId": 1
+  }
 }
 ```
 
@@ -2595,7 +2880,9 @@ Authorization: Bearer {accessToken}
 {
   "code": 200,
   "message": "操作成功",
-  "data": 1
+  "data": {
+    "sessionId": 1
+  }
 }
 ```
 
@@ -2782,7 +3069,10 @@ Authorization: Bearer {accessToken}
 {
   "code": 200,
   "message": "发送成功",
-  "data": null
+  "data": {
+    "messageId": 4001,
+    "sendTime": "2024-01-01 15:00:00"
+  }
 }
 ```
 
@@ -2807,7 +3097,10 @@ Authorization: Bearer {accessToken}
 {
   "code": 200,
   "message": "发送成功",
-  "data": null
+  "data": {
+    "messageId": 4002,
+    "sendTime": "2024-01-01 15:01:00"
+  }
 }
 ```
 
@@ -2833,7 +3126,10 @@ Authorization: Bearer {accessToken}
 {
   "code": 200,
   "message": "发送成功",
-  "data": null
+  "data": {
+    "messageId": 4003,
+    "sendTime": "2024-01-01 15:02:00"
+  }
 }
 ```
 
@@ -2867,27 +3163,47 @@ Authorization: Bearer {accessToken}
 
 **接口地址**: `GET /message/quick-reply/list`
 
-**接口描述**: 获取系统预设的快捷回复模板
+**接口描述**: 获取系统预设的快捷回复模板和用户自定义快捷回复
+
+**请求头**: 需要认证
 
 **响应示例**:
 ```json
 {
   "code": 200,
   "message": "操作成功",
-  "data": [
-    {
-      "id": 1,
-      "replyContent": "几成新？",
-      "sort": 1
-    },
-    {
-      "id": 2,
-      "replyContent": "能小刀吗？",
-      "sort": 2
-    }
-  ]
+  "data": {
+    "systemReplies": [
+      {
+        "id": 1,
+        "replyContent": "几成新？",
+        "sort": 1
+      },
+      {
+        "id": 2,
+        "replyContent": "能小刀吗？",
+        "sort": 2
+      }
+    ],
+    "userReplies": [
+      {
+        "id": 101,
+        "replyContent": "我在图书馆门口等您",
+        "sort": 1
+      }
+    ]
+  }
 }
 ```
+
+**响应字段说明**:
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| systemReplies | Array | 系统预设的快捷回复列表 |
+| userReplies | Array | 用户自定义的快捷回复列表 |
+| id | Long | 快捷回复ID |
+| replyContent | String | 回复内容 |
+| sort | Integer | 排序序号 |
 
 ---
 
@@ -3614,7 +3930,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.1.1 获取可领取优惠券列表
 
-**接口地址**: `GET /coupon/available`
+**接口地址**: `GET /api/marketing/coupon/available`
 
 **接口描述**: 获取当前可领取的优惠券列表
 
@@ -3642,7 +3958,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.1.2 领取优惠券
 
-**接口地址**: `POST /coupon/{couponId}/receive`
+**接口地址**: `POST /api/marketing/coupon/{couponId}/receive`
 
 **接口描述**: 领取指定优惠券
 
@@ -3666,7 +3982,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.1.3 获取我的优惠券列表
 
-**接口地址**: `GET /coupon/my`
+**接口地址**: `GET /api/marketing/coupon/my`
 
 **接口描述**: 获取当前用户的优惠券列表
 
@@ -3700,7 +4016,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.1.4 获取可用优惠券
 
-**接口地址**: `GET /coupon/usable`
+**接口地址**: `GET /api/marketing/coupon/usable`
 
 **接口描述**: 获取指定商品可用的优惠券
 
@@ -3731,7 +4047,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.1.5 获取优惠券详情
 
-**接口地址**: `GET /coupon/{couponId}`
+**接口地址**: `GET /api/marketing/coupon/{couponId}`
 
 **接口描述**: 获取优惠券详细信息
 
@@ -3765,7 +4081,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.1.6 新增优惠券（管理员）
 
-**接口地址**: `POST /coupon`
+**接口地址**: `POST /api/marketing/coupon`
 
 **接口描述**: 创建新的优惠券
 
@@ -3798,7 +4114,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.1.7 更新优惠券（管理员）
 
-**接口地址**: `PUT /coupon/{couponId}`
+**接口地址**: `PUT /api/marketing/coupon/{couponId}`
 
 **接口描述**: 更新优惠券信息
 
@@ -3824,7 +4140,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.1.8 删除优惠券（管理员）
 
-**接口地址**: `DELETE /coupon/{couponId}`
+**接口地址**: `DELETE /api/marketing/coupon/{couponId}`
 
 **接口描述**: 删除优惠券
 
@@ -3848,7 +4164,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.1.9 启用/禁用优惠券（管理员）
 
-**接口地址**: `PUT /coupon/{couponId}/status`
+**接口地址**: `PUT /api/marketing/coupon/{couponId}/status`
 
 **接口描述**: 切换优惠券启用状态
 
@@ -3877,7 +4193,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.1.10 分页查询优惠券（管理员）
 
-**接口地址**: `GET /coupon/page`
+**接口地址**: `GET /api/marketing/coupon/page`
 
 **接口描述**: 分页查询优惠券列表
 
@@ -3911,7 +4227,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.1.11 发放优惠券（管理员）
 
-**接口地址**: `POST /coupon/{couponId}/grant`
+**接口地址**: `POST /api/marketing/coupon/{couponId}/grant`
 
 **接口描述**: 向指定用户发放优惠券
 
@@ -3942,7 +4258,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.2.1 获取秒杀活动列表
 
-**接口地址**: `GET /seckill/list`
+**接口地址**: `GET /api/marketing/seckill/list`
 
 **接口描述**: 获取当前进行中和即将开始的秒杀活动
 
@@ -3972,7 +4288,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.2.2 获取秒杀活动详情
 
-**接口地址**: `GET /seckill/{activityId}`
+**接口地址**: `GET /api/marketing/seckill/{activityId}`
 
 **接口描述**: 获取秒杀活动详细信息
 
@@ -4004,7 +4320,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.2.3 获取秒杀商品详情
 
-**接口地址**: `GET /seckill/product/{productId}`
+**接口地址**: `GET /api/marketing/seckill/product/{productId}`
 
 **接口描述**: 获取秒杀商品的详细信息
 
@@ -4034,7 +4350,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.2.4 参与秒杀
 
-**接口地址**: `POST /seckill/{activityId}/join`
+**接口地址**: `POST /api/marketing/seckill/{activityId}/join`
 
 **接口描述**: 参与秒杀抢购
 
@@ -4058,7 +4374,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.2.5 获取秒杀结果
 
-**接口地址**: `GET /seckill/{activityId}/result`
+**接口地址**: `GET /api/marketing/seckill/{activityId}/result`
 
 **接口描述**: 查询秒杀抢购结果
 
@@ -4086,7 +4402,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.2.6 创建秒杀活动（管理员）
 
-**接口地址**: `POST /seckill`
+**接口地址**: `POST /api/marketing/seckill`
 
 **接口描述**: 创建新的秒杀活动
 
@@ -4117,7 +4433,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.2.7 更新秒杀活动（管理员）
 
-**接口地址**: `PUT /seckill/{activityId}`
+**接口地址**: `PUT /api/marketing/seckill/{activityId}`
 
 **接口描述**: 更新秒杀活动信息
 
@@ -4143,7 +4459,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.2.8 删除秒杀活动（管理员）
 
-**接口地址**: `DELETE /seckill/{activityId}`
+**接口地址**: `DELETE /api/marketing/seckill/{activityId}`
 
 **接口描述**: 删除秒杀活动
 
@@ -4167,7 +4483,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.2.9 分页查询秒杀活动（管理员）
 
-**接口地址**: `GET /seckill/page`
+**接口地址**: `GET /api/marketing/seckill/page`
 
 **接口描述**: 分页查询秒杀活动列表
 
@@ -4199,7 +4515,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.2.10 获取今日秒杀
 
-**接口地址**: `GET /seckill/today`
+**接口地址**: `GET /api/marketing/seckill/today`
 
 **接口描述**: 获取今日的秒杀活动时间表
 
@@ -4227,7 +4543,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.2.11 获取秒杀时段
 
-**接口地址**: `GET /seckill/time-slots`
+**接口地址**: `GET /api/marketing/seckill/time-slots`
 
 **接口描述**: 获取秒杀活动的时间段列表
 
@@ -4253,7 +4569,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.2.12 设置秒杀提醒
 
-**接口地址**: `POST /seckill/{activityId}/reminder`
+**接口地址**: `POST /api/marketing/seckill/{activityId}/reminder`
 
 **接口描述**: 设置秒杀开始前的提醒
 
@@ -4277,7 +4593,7 @@ Authorization: Bearer {accessToken}
 
 #### 8.2.13 取消秒杀提醒
 
-**接口地址**: `DELETE /seckill/{activityId}/reminder`
+**接口地址**: `DELETE /api/marketing/seckill/{activityId}/reminder`
 
 **接口描述**: 取消秒杀提醒
 
@@ -4634,7 +4950,19 @@ Authorization: Bearer {accessToken}
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
 | orderId | Long | 是 | 订单ID |
-| payType | String | 是 | 支付方式 |
+| payType | String | 是 | 支付方式：WECHAT-微信，ALIPAY-支付宝，CAMPUS_CARD-校园卡 |
+| clientIp | String | 否 | 客户端IP地址（用于风控） |
+| userAgent | String | 否 | 用户代理信息（用于风控） |
+
+**请求示例**:
+```json
+{
+  "orderId": 2001,
+  "payType": "WECHAT",
+  "clientIp": "192.168.1.100",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+}
+```
 
 **响应示例**:
 ```json
@@ -4796,6 +5124,59 @@ success
       "payName": "校园卡"
     }
   ]
+}
+```
+
+---
+
+#### 9.2.8 获取模拟支付信息（开发测试）
+
+**接口地址**: `GET /payment/mock/info/{payToken}`
+
+**接口描述**: 根据支付Token获取模拟支付详情（仅用于开发测试环境）
+
+**路径参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| payToken | String | 是 | 支付Token |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "orderNo": "XS20240101001",
+    "amount": 30.00,
+    "productName": "大学物理教材",
+    "payType": "WECHAT",
+    "expireTime": "2024-01-01 12:30:00"
+  }
+}
+```
+
+---
+
+#### 9.2.9 模拟支付确认（开发测试）
+
+**接口地址**: `POST /payment/mock/confirm`
+
+**接口描述**: 确认模拟支付结果（仅用于开发测试环境）
+
+**请求头**: 需要认证
+
+**请求参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| payToken | String | 是 | 支付Token |
+| success | Boolean | 否 | 是否支付成功，默认true |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "支付成功",
+  "data": null
 }
 ```
 
@@ -5183,9 +5564,125 @@ success
 
 ## 十、运营管理模块 API（管理员）
 
-### 10.1 商品审核管理
+### 10.1 管理员认证
 
-#### 10.1.1 获取待审核商品列表
+#### 10.1.1 管理员登录
+
+**接口地址**: `POST /admin/auth/login`
+
+**接口描述**: 管理员登录，返回JWT令牌
+
+**请求参数**:
+```json
+{
+  "username": "admin",
+  "password": "admin123"
+}
+```
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| username | String | 是 | 管理员用户名 |
+| password | String | 是 | 密码 |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "登录成功",
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "tokenType": "Bearer",
+    "expiresIn": 7200,
+    "adminInfo": {
+      "id": 1,
+      "username": "admin",
+      "realName": "系统管理员",
+      "role": "SUPER_ADMIN"
+    }
+  }
+}
+```
+
+---
+
+#### 10.1.2 管理员登出
+
+**接口地址**: `POST /admin/auth/logout`
+
+**接口描述**: 管理员退出登录，清除Token
+
+**请求头**: 需要管理员认证
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "登出成功",
+  "data": null
+}
+```
+
+---
+
+#### 10.1.3 获取当前管理员信息
+
+**接口地址**: `GET /admin/auth/info`
+
+**接口描述**: 获取当前登录管理员的详细信息
+
+**请求头**: 需要管理员认证
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "id": 1,
+    "username": "admin",
+    "realName": "系统管理员",
+    "phone": "138****0000",
+    "email": "admin@campus.edu.cn",
+    "role": "SUPER_ADMIN",
+    "createTime": "2024-01-01 00:00:00"
+  }
+}
+```
+
+---
+
+#### 10.1.4 刷新管理员Token
+
+**接口地址**: `POST /admin/auth/refresh-token`
+
+**接口描述**: 使用刷新令牌获取新的访问令牌
+
+**请求参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| refreshToken | String | 是 | 刷新令牌 |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "刷新成功",
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "tokenType": "Bearer",
+    "expiresIn": 7200
+  }
+}
+```
+
+---
+
+### 10.2 商品审核管理
+
+#### 10.2.1 获取待审核商品列表
 
 **接口地址**: `GET /admin/audit/pending`
 
@@ -5216,7 +5713,7 @@ success
 
 ---
 
-#### 10.1.2 审核通过
+#### 10.2.2 审核通过
 
 **接口地址**: `PUT /admin/audit/{productId}/pass`
 
@@ -5240,7 +5737,7 @@ success
 
 ---
 
-#### 10.1.3 审核驳回
+#### 10.2.3 审核驳回
 
 **接口地址**: `PUT /admin/audit/{productId}/reject`
 
@@ -5269,7 +5766,7 @@ success
 
 ---
 
-#### 10.1.4 批量审核通过
+#### 10.2.4 批量审核通过
 
 **接口地址**: `PUT /admin/audit/batch/pass`
 
@@ -5279,7 +5776,9 @@ success
 
 **请求参数**:
 ```json
-[1001, 1002, 1003]
+{
+  "productIds": [1001, 1002, 1003]
+}
 ```
 
 **响应示例**:
@@ -5287,13 +5786,16 @@ success
 {
   "code": 200,
   "message": "批量审核成功",
-  "data": null
+  "data": {
+    "successCount": 3,
+    "failCount": 0
+  }
 }
 ```
 
 ---
 
-#### 10.1.5 获取审核记录
+#### 10.2.5 获取审核记录
 
 **接口地址**: `GET /admin/audit/{productId}/records`
 
@@ -5325,7 +5827,7 @@ success
 
 ---
 
-#### 10.1.6 强制下架
+#### 10.2.6 强制下架
 
 **接口地址**: `PUT /admin/audit/{productId}/force-off`
 
@@ -5354,7 +5856,7 @@ success
 
 ---
 
-#### 10.1.7 获取审核统计
+#### 10.2.7 获取审核统计
 
 **接口地址**: `GET /admin/audit/statistics`
 
@@ -5377,9 +5879,9 @@ success
 
 ---
 
-### 10.2 用户管理
+### 10.3 用户管理
 
-#### 10.2.1 获取用户列表
+#### 10.3.1 获取用户列表
 
 **接口地址**: `GET /admin/user/page`
 
@@ -5413,7 +5915,7 @@ success
 
 ---
 
-#### 10.2.2 获取用户详情
+#### 10.3.2 获取用户详情
 
 **接口地址**: `GET /admin/user/{userId}`
 
@@ -5444,7 +5946,7 @@ success
 
 ---
 
-#### 10.2.3 获取待审核认证列表
+#### 10.3.3 获取待审核认证列表
 
 **接口地址**: `GET /admin/user/auth/pending`
 
@@ -5475,7 +5977,7 @@ success
 
 ---
 
-#### 10.2.4 审核通过认证
+#### 10.3.4 审核通过认证
 
 **接口地址**: `PUT /admin/user/auth/{userId}/pass`
 
@@ -5499,7 +6001,7 @@ success
 
 ---
 
-#### 10.2.5 审核驳回认证
+#### 10.3.5 审核驳回认证
 
 **接口地址**: `PUT /admin/user/auth/{userId}/reject`
 
@@ -5528,7 +6030,7 @@ success
 
 ---
 
-#### 10.2.6 封禁用户
+#### 10.3.6 封禁用户
 
 **接口地址**: `PUT /admin/user/{userId}/ban`
 
@@ -5557,7 +6059,7 @@ success
 
 ---
 
-#### 10.2.7 解封用户
+#### 10.3.7 解封用户
 
 **接口地址**: `PUT /admin/user/{userId}/unban`
 
@@ -5581,7 +6083,7 @@ success
 
 ---
 
-#### 10.2.8 调整信誉分
+#### 10.3.8 调整信誉分
 
 **接口地址**: `PUT /admin/user/{userId}/credit`
 
@@ -5605,13 +6107,15 @@ success
 {
   "code": 200,
   "message": "调整成功",
-  "data": null
+  "data": {
+    "newScore": 95
+  }
 }
 ```
 
 ---
 
-#### 10.2.9 获取用户认证记录
+#### 10.3.9 获取用户认证记录
 
 **接口地址**: `GET /admin/user/auth/{userId}/records`
 
@@ -5642,9 +6146,9 @@ success
 
 ---
 
-### 10.3 数据统计
+### 10.4 数据统计
 
-#### 10.3.1 获取今日数据概览
+#### 10.4.1 获取今日数据概览
 
 **接口地址**: `GET /admin/statistics/today`
 
@@ -5670,7 +6174,7 @@ success
 
 ---
 
-#### 10.3.2 获取日期范围统计
+#### 10.4.2 获取日期范围统计
 
 **接口地址**: `GET /admin/statistics/range`
 
@@ -5700,7 +6204,7 @@ success
 
 ---
 
-#### 10.3.3 获取商品发布趋势
+#### 10.4.3 获取商品发布趋势
 
 **接口地址**: `GET /admin/statistics/product/trend`
 
@@ -5729,7 +6233,7 @@ success
 
 ---
 
-#### 10.3.4 获取成交趋势
+#### 10.4.4 获取成交趋势
 
 **接口地址**: `GET /admin/statistics/order/trend`
 
@@ -5759,7 +6263,7 @@ success
 
 ---
 
-#### 10.3.5 获取热门品类统计
+#### 10.4.5 获取热门品类统计
 
 **接口地址**: `GET /admin/statistics/category/hot`
 
@@ -5842,7 +6346,7 @@ success
 
 ---
 
-#### 10.3.8 获取优惠券统计
+#### 10.4.8 获取优惠券统计
 
 **接口地址**: `GET /admin/statistics/coupon`
 
@@ -5865,7 +6369,7 @@ success
 
 ---
 
-#### 10.3.9 获取AI分类准确率统计
+#### 10.4.9 获取AI分类准确率统计
 
 **接口地址**: `GET /admin/statistics/ai/accuracy`
 
@@ -5888,7 +6392,7 @@ success
 
 ---
 
-#### 10.3.10 导出统计报表
+#### 10.4.10 导出统计报表
 
 **接口地址**: `GET /admin/statistics/export`
 
@@ -5913,7 +6417,7 @@ success
 
 ---
 
-#### 10.3.11 获取用户活跃度统计
+#### 10.4.11 获取用户活跃度统计
 
 **接口地址**: `GET /admin/statistics/user/activity`
 
@@ -5936,9 +6440,9 @@ success
 
 ---
 
-### 10.4 系统配置管理
+### 10.5 系统配置管理
 
-#### 10.4.1 获取配置列表
+#### 10.5.1 获取配置列表
 
 **接口地址**: `GET /admin/config/list`
 
@@ -5964,7 +6468,7 @@ success
 
 ---
 
-#### 10.4.2 获取配置详情
+#### 10.5.2 获取配置详情
 
 **接口地址**: `GET /admin/config/{configKey}`
 
@@ -5992,7 +6496,7 @@ success
 
 ---
 
-#### 10.4.3 更新配置
+#### 10.5.3 更新配置
 
 **接口地址**: `PUT /admin/config/{configKey}`
 
@@ -6021,7 +6525,7 @@ success
 
 ---
 
-#### 10.4.4 批量更新配置
+#### 10.5.4 批量更新配置
 
 **接口地址**: `PUT /admin/config/batch`
 
@@ -6031,14 +6535,12 @@ success
 
 **请求参数**:
 ```json
-{
-  "configs": [
-    {
-      "configKey": "campus_fence",
-      "configValue": "116.40,39.90"
-    }
-  ]
-}
+[
+  {
+    "configKey": "campus_fence",
+    "configValue": "116.40,39.90"
+  }
+]
 ```
 
 **响应示例**:
@@ -6052,7 +6554,7 @@ success
 
 ---
 
-#### 10.4.5 获取校园围栏配置
+#### 10.5.5 获取校园围栏配置
 
 **接口地址**: `GET /admin/config/campus-fence`
 
@@ -6075,7 +6577,7 @@ success
 
 ---
 
-#### 10.4.6 更新校园围栏配置
+#### 10.5.6 更新校园围栏配置
 
 **接口地址**: `PUT /admin/config/campus-fence`
 
@@ -6103,7 +6605,7 @@ success
 
 ---
 
-#### 10.4.7 获取秒杀配置
+#### 10.5.7 获取秒杀配置
 
 **接口地址**: `GET /admin/config/seckill`
 
@@ -6125,7 +6627,7 @@ success
 
 ---
 
-#### 10.4.8 更新秒杀配置
+#### 10.5.8 更新秒杀配置
 
 **接口地址**: `PUT /admin/config/seckill`
 
@@ -6152,7 +6654,7 @@ success
 
 ---
 
-#### 10.4.9 刷新缓存
+#### 10.5.9 刷新缓存
 
 **接口地址**: `POST /admin/config/refresh-cache`
 
@@ -6171,7 +6673,7 @@ success
 
 ---
 
-#### 10.4.10 获取配置修改记录
+#### 10.5.10 获取配置修改记录
 
 **接口地址**: `GET /admin/config/history`
 
@@ -6207,6 +6709,209 @@ success
       }
     ]
   }
+}
+```
+
+---
+
+### 10.6 纠纷处理管理
+
+#### 10.6.1 获取纠纷列表
+
+**接口地址**: `GET /admin/dispute/page`
+
+**接口描述**: 分页获取纠纷列表
+
+**请求头**: 需要管理员权限
+
+**请求参数**:
+| 参数名 | 类型 | 必填 | 默认值 | 说明 |
+|--------|------|------|--------|------|
+| status | String | 否 | - | 纠纷状态：PENDING-待处理，PROCESSING-处理中，RESOLVED-已解决 |
+| disputeType | String | 否 | - | 纠纷类型 |
+| pageNum | Integer | 否 | 1 | 页码 |
+| pageSize | Integer | 否 | 10 | 每页数量 |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "total": 20,
+    "pageNum": 1,
+    "pageSize": 10,
+    "pages": 2,
+    "list": [
+      {
+        "id": 1,
+        "orderId": 2001,
+        "initiatorId": 1,
+        "initiatorName": "张三",
+        "accusedId": 2,
+        "accusedName": "李四",
+        "disputeType": "PRODUCT_NOT_MATCH",
+        "disputeStatus": "PENDING",
+        "createTime": "2024-01-03 10:00:00"
+      }
+    ]
+  }
+}
+```
+
+---
+
+#### 10.6.2 获取纠纷详情
+
+**接口地址**: `GET /admin/dispute/{disputeId}`
+
+**接口描述**: 获取纠纷详细信息
+
+**请求头**: 需要管理员权限
+
+**路径参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| disputeId | Long | 是 | 纠纷ID |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "id": 1,
+    "orderId": 2001,
+    "orderNo": "XS20240101001",
+    "initiatorId": 1,
+    "initiatorName": "张三",
+    "accusedId": 2,
+    "accusedName": "李四",
+    "disputeType": "PRODUCT_NOT_MATCH",
+    "evidenceUrl": "https://oss.example.com/evidence1.jpg",
+    "disputeStatus": "PENDING",
+    "createTime": "2024-01-03 10:00:00",
+    "orderInfo": {
+      "productId": 1001,
+      "productName": "大学物理教材",
+      "productPrice": 35.00
+    }
+  }
+}
+```
+
+---
+
+#### 10.6.3 处理纠纷
+
+**接口地址**: `PUT /admin/dispute/{disputeId}/process`
+
+**接口描述**: 管理员处理纠纷
+
+**请求头**: 需要管理员权限
+
+**路径参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| disputeId | Long | 是 | 纠纷ID |
+
+**请求参数**:
+```json
+{
+  "processResult": "RESOLVED",
+  "processRemark": "经核实，商品确实与描述不符，同意退款",
+  "refundAmount": 30.00,
+  "deductCreditScore": 5
+}
+```
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| processResult | String | 是 | 处理结果：RESOLVED-已解决，REJECTED-驳回 |
+| processRemark | String | 是 | 处理备注 |
+| refundAmount | BigDecimal | 否 | 退款金额（processResult为RESOLVED时可选） |
+| deductCreditScore | Integer | 否 | 扣除信誉分（正数扣分，负数加分） |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "处理成功",
+  "data": null
+}
+```
+
+---
+
+### 10.7 操作日志管理
+
+#### 10.7.1 获取操作日志列表
+
+**接口地址**: `GET /admin/log/page`
+
+**接口描述**: 分页获取管理员操作日志
+
+**请求头**: 需要管理员权限
+
+**请求参数**:
+| 参数名 | 类型 | 必填 | 默认值 | 说明 |
+|--------|------|------|--------|------|
+| adminId | Long | 否 | - | 管理员ID |
+| operateType | String | 否 | - | 操作类型 |
+| startDate | LocalDate | 否 | - | 开始日期 |
+| endDate | LocalDate | 否 | - | 结束日期 |
+| pageNum | Integer | 否 | 1 | 页码 |
+| pageSize | Integer | 否 | 10 | 每页数量 |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "total": 100,
+    "pageNum": 1,
+    "pageSize": 10,
+    "pages": 10,
+    "list": [
+      {
+        "id": 1,
+        "adminId": 1,
+        "adminName": "系统管理员",
+        "operateType": "AUDIT_PASS",
+        "operateDesc": "审核通过商品：大学物理教材",
+        "operateIp": "192.168.1.100",
+        "operateTime": "2024-01-01 15:00:00"
+      }
+    ]
+  }
+}
+```
+
+---
+
+#### 10.7.2 导出操作日志
+
+**接口地址**: `GET /admin/log/export`
+
+**接口描述**: 导出指定日期范围的操作日志
+
+**请求头**: 需要管理员权限
+
+**请求参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| adminId | Long | 否 | 管理员ID |
+| operateType | String | 否 | 操作类型 |
+| startDate | LocalDate | 是 | 开始日期 |
+| endDate | LocalDate | 是 | 结束日期 |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "导出成功",
+  "data": "https://oss.example.com/operation_log.xlsx"
 }
 ```
 
@@ -6316,6 +7021,8 @@ success
 
 ### B. 错误码说明
 
+#### B.1 通用错误码
+
 | 错误码 | 说明 |
 |--------|------|
 | 200 | 操作成功 |
@@ -6324,29 +7031,75 @@ success
 | 403 | 无权限访问 |
 | 404 | 资源不存在 |
 | 500 | 服务器内部错误 |
-| 1001 | 用户名已存在 |
-| 1002 | 手机号已注册 |
-| 1003 | 密码错误 |
-| 1004 | 用户不存在 |
-| 1005 | 认证信息不完整 |
-| 2001 | 商品不存在 |
-| 2002 | 商品已下架 |
-| 2003 | 商品已售出 |
-| 2004 | 无权操作该商品 |
-| 3001 | 订单不存在 |
-| 3002 | 订单状态异常 |
-| 3003 | 支付失败 |
-| 3004 | 退款失败 |
-| 4001 | 优惠券不存在 |
-| 4002 | 优惠券已领完 |
-| 4003 | 优惠券已过期 |
-| 4004 | 优惠券不满足使用条件 |
-| 5001 | 秒杀活动不存在 |
-| 5002 | 秒杀活动未开始 |
-| 5003 | 秒杀活动已结束 |
-| 5004 | 秒杀库存不足 |
-| 6001 | 会话不存在 |
-| 6002 | 消息发送失败 |
+
+#### B.2 用户模块错误码（1000-1999）
+
+| 错误码 | 说明 | 触发场景 |
+|--------|------|---------|
+| 1001 | 用户名已存在 | 注册时用户名重复 |
+| 1002 | 手机号已注册 | 注册时手机号重复 |
+| 1003 | 密码错误 | 登录时密码不正确 |
+| 1004 | 用户不存在 | 查询用户信息时 |
+| 1005 | 认证信息不完整 | 提交认证时缺少必填项 |
+| 1006 | 验证码错误 | 验证码校验失败 |
+| 1007 | 验证码已过期 | 验证码超过有效期 |
+| 1008 | 用户已被封禁 | 用户状态为封禁状态 |
+| 1009 | 信誉分过低 | 信誉分低于60分 |
+
+#### B.3 商品模块错误码（2000-2999）
+
+| 错误码 | 说明 | 触发场景 |
+|--------|------|---------|
+| 2001 | 商品不存在 | 查询商品详情时商品ID无效 |
+| 2002 | 商品已下架 | 操作已下架商品 |
+| 2003 | 商品已售出 | 购买已成交商品 |
+| 2004 | 无权操作该商品 | 非商品所有者操作商品 |
+| 2005 | 品类不存在 | 发布商品时品类ID无效 |
+| 2006 | 图片数量超限 | 上传图片超过9张 |
+| 2007 | 未通过校园认证 | 发布商品时用户未认证 |
+| 2008 | 信誉分过低 | 发布商品时信誉分<60 |
+| 2009 | 不在校园范围内 | 发布商品时定位校验失败 |
+| 2010 | 草稿不存在 | 操作草稿时草稿ID无效 |
+| 2011 | 商品状态异常 | 商品状态不允许该操作 |
+| 2012 | 商品信息不完整 | 发布商品时缺少必填项 |
+| 2013 | 价格格式错误 | 价格不是有效的数字格式 |
+| 2014 | 商品名称过长 | 商品名称超过最大长度限制 |
+| 2015 | 商品描述过长 | 商品描述超过最大长度限制 |
+
+#### B.4 订单模块错误码（3000-3999）
+
+| 错误码 | 说明 | 触发场景 |
+|--------|------|---------|
+| 3001 | 订单不存在 | 查询订单时订单ID无效 |
+| 3002 | 订单状态异常 | 订单状态不允许该操作 |
+| 3003 | 支付失败 | 支付过程中发生错误 |
+| 3004 | 退款失败 | 退款过程中发生错误 |
+| 3005 | 订单已取消 | 操作已取消的订单 |
+| 3006 | 订单已支付 | 重复支付订单 |
+
+#### B.5 营销模块错误码（4000-4999）
+
+| 错误码 | 说明 | 触发场景 |
+|--------|------|---------|
+| 4001 | 优惠券不存在 | 优惠券ID无效 |
+| 4002 | 优惠券已领完 | 优惠券库存为0 |
+| 4003 | 优惠券已过期 | 优惠券已过有效期 |
+| 4004 | 优惠券不满足使用条件 | 订单金额不满足使用门槛 |
+| 4005 | 优惠券已被领取 | 用户已领取过该优惠券 |
+| 4006 | 优惠券已使用 | 优惠券已被使用 |
+| 5001 | 秒杀活动不存在 | 秒杀活动ID无效 |
+| 5002 | 秒杀活动未开始 | 秒杀活动尚未开始 |
+| 5003 | 秒杀活动已结束 | 秒杀活动已结束 |
+| 5004 | 秒杀库存不足 | 秒杀商品库存不足 |
+
+#### B.6 IM模块错误码（6000-6999）
+
+| 错误码 | 说明 | 触发场景 |
+|--------|------|---------|
+| 6001 | 会话不存在 | 会话ID无效 |
+| 6002 | 消息发送失败 | 消息发送过程中发生错误 |
+| 6003 | 消息已撤回 | 操作已撤回的消息 |
+| 6004 | 会话已关闭 | 会话状态为已关闭 |
 
 ---
 
@@ -6434,6 +7187,182 @@ curl -X POST http://localhost:8080/payment/create \
     "payType": "WECHAT"
   }'
 ```
+
+---
+
+## 十一、内部接口 API（供其他服务调用）
+
+### 11.1 根据ID获取用户信息
+
+**接口地址**: `GET /user/inner/{userId}`
+
+**接口描述**: 供其他微服务调用，获取用户公开信息
+
+**请求头**: 内部服务调用（需验证服务身份）
+
+**路径参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| userId | Long | 是 | 用户ID |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "id": 1,
+    "username": "张三",
+    "avatar": "https://oss.example.com/avatar.jpg",
+    "phone": "138****8000",
+    "identityType": "STUDENT",
+    "authStatus": "VERIFIED",
+    "creditScore": 95
+  }
+}
+```
+
+**说明**:
+- 该接口仅供内部微服务调用，外部无法访问
+- 返回用户的基本公开信息，不包含敏感信息
+- 手机号已脱敏处理
+
+---
+
+### 11.2 批量获取用户信息
+
+**接口地址**: `POST /user/inner/batch`
+
+**接口描述**: 供其他微服务调用，批量获取用户信息
+
+**请求头**: 内部服务调用（需验证服务身份）
+
+**请求参数**:
+```json
+{
+  "userIds": [1, 2, 3, 4, 5]
+}
+```
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": [
+    {
+      "id": 1,
+      "username": "张三",
+      "avatar": "https://oss.example.com/avatar1.jpg",
+      "phone": "138****8000",
+      "identityType": "STUDENT",
+      "authStatus": "VERIFIED",
+      "creditScore": 95
+    },
+    {
+      "id": 2,
+      "username": "李四",
+      "avatar": "https://oss.example.com/avatar2.jpg",
+      "phone": "139****9000",
+      "identityType": "TEACHER",
+      "authStatus": "VERIFIED",
+      "creditScore": 98
+    }
+  ]
+}
+```
+
+**说明**:
+- 该接口仅供内部微服务调用
+- 一次最多查询100个用户信息
+- 返回用户的基本公开信息，不包含敏感信息
+
+---
+
+### 11.3 获取用户认证状态
+
+**接口地址**: `GET /user/inner/{userId}/auth-status`
+
+**接口描述**: 供其他微服务调用，获取用户认证状态
+
+**请求头**: 内部服务调用（需验证服务身份）
+
+**路径参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| userId | Long | 是 | 用户ID |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "userId": 1,
+    "authStatus": "VERIFIED",
+    "identityType": "STUDENT",
+    "realName": "张三",
+    "schoolName": "XX大学",
+    "studentId": "2021001",
+    "authTime": "2024-01-01 10:00:00"
+  }
+}
+```
+
+**说明**:
+- 该接口仅供内部微服务调用
+- 返回用户的认证状态和认证信息
+- 如果用户未认证，`authStatus`为`UNVERIFIED`，其他字段为null
+
+---
+
+### 11.4 批量获取用户认证状态
+
+**接口地址**: `POST /user/inner/auth-status/batch`
+
+**接口描述**: 供其他微服务调用，批量获取用户认证状态
+
+**请求头**: 内部服务调用（需验证服务身份）
+
+**请求参数**:
+```json
+{
+  "userIds": [1, 2, 3, 4, 5]
+}
+```
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": [
+    {
+      "userId": 1,
+      "authStatus": "VERIFIED",
+      "identityType": "STUDENT",
+      "realName": "张三",
+      "schoolName": "XX大学",
+      "studentId": "2021001",
+      "authTime": "2024-01-01 10:00:00"
+    },
+    {
+      "userId": 2,
+      "authStatus": "VERIFIED",
+      "identityType": "TEACHER",
+      "realName": "李四",
+      "schoolName": "XX大学",
+      "teacherId": "T2021001",
+      "authTime": "2024-01-02 10:00:00"
+    }
+  ]
+}
+```
+
+**说明**:
+- 该接口仅供内部微服务调用
+- 一次最多查询100个用户认证状态
+- 如果用户未认证，`authStatus`为`UNVERIFIED`，其他字段为null
 
 ---
 

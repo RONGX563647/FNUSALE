@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest test_trade_api.py -v --tb=short)",
+      "Bash(python -m pytest test_marketing_api.py -v --tb=short)",
+      "Bash(./venv/bin/python -m pip install pytest-xdist -q)",
+      "Bash(./venv/bin/python -m pytest test_trade_api.py -v --tb=short)",
+      "Bash(pip3 install:*)",
+      "Bash(python3 -m pytest test_marketing_api.py -v --tb=short)",
+      "Bash(./venv/bin/python -m pytest test_marketing_api.py -v --tb=short)",
+      "Bash(./venv/bin/python -m pytest test_trade_api.py -v --html=trade_report.html --self-contained-html)",
+      "Bash(docker-compose -f /Users/rongx/Desktop/Code/git/FNUSALE/backend/docker/docker-compose.yml up -d nacos rocketmq-nameserver rocketmq-broker)",
+      "Bash(curl -s http://localhost:8105/actuator/health)",
+      "Bash(/Users/rongx/Desktop/Code/git/FNUSALE/tests/pytest.ini:*)",
+      "Bash(brew list:*)",
+      "Bash(sshpass -p 'Lrx563647' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@111.230.60.71 'echo \"\"Connection successful\"\" && uname -a && docker --version 2>/dev/null || echo \"\"Docker not installed\"\"')"
+    ]
+  }
+}
