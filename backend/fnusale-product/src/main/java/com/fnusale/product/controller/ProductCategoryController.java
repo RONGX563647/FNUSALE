@@ -3,10 +3,12 @@ package com.fnusale.product.controller;
 import com.fnusale.common.common.Result;
 import com.fnusale.common.dto.product.ProductCategoryDTO;
 import com.fnusale.common.vo.product.ProductCategoryVO;
+import com.fnusale.product.service.ProductCategoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,42 +19,45 @@ import java.util.List;
 @Tag(name = "商品品类管理", description = "商品品类的增删改查接口")
 @RestController
 @RequestMapping("/category")
+@RequiredArgsConstructor
 public class ProductCategoryController {
+
+    private final ProductCategoryService productCategoryService;
 
     @Operation(summary = "获取品类树", description = "获取完整的品类树形结构")
     @GetMapping("/tree")
     public Result<List<ProductCategoryVO>> getTree() {
-        // TODO: 实现获取品类树逻辑
-        return Result.success();
+        List<ProductCategoryVO> tree = productCategoryService.getTree();
+        return Result.success(tree);
     }
 
     @Operation(summary = "获取一级品类列表", description = "获取所有一级品类")
     @GetMapping("/list")
     public Result<List<ProductCategoryVO>> getList() {
-        // TODO: 实现获取一级品类列表逻辑
-        return Result.success();
+        List<ProductCategoryVO> list = productCategoryService.getList();
+        return Result.success(list);
     }
 
     @Operation(summary = "获取子品类", description = "根据父ID获取子品类列表")
     @GetMapping("/children/{parentId}")
     public Result<List<ProductCategoryVO>> getChildren(
             @Parameter(description = "父品类ID") @PathVariable Long parentId) {
-        // TODO: 实现获取子品类逻辑
-        return Result.success();
+        List<ProductCategoryVO> children = productCategoryService.getChildren(parentId);
+        return Result.success(children);
     }
 
     @Operation(summary = "获取品类详情", description = "根据ID获取品类详细信息")
     @GetMapping("/{id}")
     public Result<ProductCategoryVO> getById(
             @Parameter(description = "品类ID") @PathVariable Long id) {
-        // TODO: 实现获取品类详情逻辑
-        return Result.success();
+        ProductCategoryVO category = productCategoryService.getById(id);
+        return Result.success(category);
     }
 
     @Operation(summary = "新增品类", description = "添加新品类（管理员）")
     @PostMapping
     public Result<Void> add(@Valid @RequestBody ProductCategoryDTO dto) {
-        // TODO: 实现新增品类逻辑
+        productCategoryService.add(dto);
         return Result.success();
     }
 
@@ -61,7 +66,7 @@ public class ProductCategoryController {
     public Result<Void> update(
             @Parameter(description = "品类ID") @PathVariable Long id,
             @Valid @RequestBody ProductCategoryDTO dto) {
-        // TODO: 实现更新品类逻辑
+        productCategoryService.update(id, dto);
         return Result.success();
     }
 
@@ -69,7 +74,7 @@ public class ProductCategoryController {
     @DeleteMapping("/{id}")
     public Result<Void> delete(
             @Parameter(description = "品类ID") @PathVariable Long id) {
-        // TODO: 实现删除品类逻辑
+        productCategoryService.delete(id);
         return Result.success();
     }
 
@@ -78,14 +83,14 @@ public class ProductCategoryController {
     public Result<Void> updateStatus(
             @Parameter(description = "品类ID") @PathVariable Long id,
             @Parameter(description = "启用状态(0-禁用,1-启用)") @RequestParam Integer status) {
-        // TODO: 实现启用/禁用品类逻辑
+        productCategoryService.updateStatus(id, status);
         return Result.success();
     }
 
     @Operation(summary = "获取热门品类", description = "获取热门品类列表")
     @GetMapping("/hot")
     public Result<List<ProductCategoryVO>> getHotCategories() {
-        // TODO: 实现获取热门品类逻辑
-        return Result.success();
+        List<ProductCategoryVO> hotCategories = productCategoryService.getHotCategories();
+        return Result.success(hotCategories);
     }
 }
