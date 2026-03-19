@@ -3,15 +3,16 @@ package com.fnusale.user.service.impl;
 import com.fnusale.common.cache.RedisService;
 import com.fnusale.common.common.PageResult;
 import com.fnusale.common.constant.RedisKeyConstants;
+import com.fnusale.common.dto.amap.AmapLocationResult;
 import com.fnusale.common.dto.user.CampusPickPointDTO;
 import com.fnusale.common.entity.CampusPickPoint;
 import com.fnusale.common.exception.BusinessException;
+import com.fnusale.common.service.AmapService;
 import com.fnusale.common.vo.user.CampusPickPointVO;
 import com.fnusale.user.mapper.CampusPickPointMapper;
 import com.fnusale.user.service.CampusPickPointService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.geo.Point;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +25,7 @@ import java.util.stream.Collectors;
 
 /**
  * 校园自提点服务实现
- * 使用 Redis GEO 优化地理位置查询
+ * 使用高德地图API进行地理位置计算
  */
 @Slf4j
 @Service
@@ -33,6 +34,7 @@ public class CampusPickPointServiceImpl implements CampusPickPointService {
 
     private final CampusPickPointMapper campusPickPointMapper;
     private final RedisService redisService;
+    private final AmapService amapService;
 
     /**
      * 自提点详情缓存过期时间（小时）
@@ -44,9 +46,13 @@ public class CampusPickPointServiceImpl implements CampusPickPointService {
      */
     private static final long LIST_CACHE_HOURS = 1;
 
+    /**
+     * IP定位结果缓存过期时间（分钟）
+     */
+    private static final long IP_LOCATION_CACHE_MINUTES = 30;
+
     @Override
     public List<CampusPickPointVO> getList() {
-        // 尝试从缓存获取
         String listKey = RedisKeyConstants.PICK_POINT_LIST_KEY;
         Map<String, String> cachedList = redisService.hGetAll(listKey);
 
@@ -56,11 +62,8 @@ public class CampusPickPointServiceImpl implements CampusPickPointService {
                     .collect(Collectors.toList());
         }
 
-        // 从数据库获取
         List<CampusPickPoint> list = campusPickPointMapper.selectAllEnabled();
-
-        // 同步到 GEO 和缓存
-        syncToGeoAndCache(list);
+        cachePickPointList(list);
 
         return list.stream()
                 .map(this::buildCampusPickPointVO)
@@ -68,34 +71,39 @@ public class CampusPickPointServiceImpl implements CampusPickPointService {
     }
 
     @Override
-    public List<CampusPickPointVO> getNearby(String longitude, String latitude, Integer distance) {
-        double userLng = Double.parseDouble(longitude);
-        double userLat = Double.parseDouble(latitude);
+    public List<CampusPickPointVO> getNearby(String longitude, String latitude, Integer distance, String ip) {
+        String userLng = longitude;
+        String userLat = latitude;
 
-        // 使用 Redis GEO 查询附近自提点
-        List<RedisService.GeoResult> geoResults = redisService.geoRadius(
-                RedisKeyConstants.PICK_POINT_GEO_KEY,
-                userLng, userLat, distance);
-
-        // 如果 GEO 数据为空，先同步
-        if (geoResults.isEmpty()) {
-            syncGeoData();
-            geoResults = redisService.geoRadius(
-                    RedisKeyConstants.PICK_POINT_GEO_KEY,
-                    userLng, userLat, distance);
+        if ((userLng == null || userLng.isEmpty()) || (userLat == null || userLat.isEmpty())) {
+            AmapLocationResult locationResult = getLocationByIp(ip);
+            if (locationResult.isSuccess()) {
+                userLng = locationResult.getLongitude();
+                userLat = locationResult.getLatitude();
+                log.info("IP定位成功，IP: {}, 位置: {},{}", ip, userLng, userLat);
+            } else {
+                log.warn("IP定位失败，返回所有自提点: {}", locationResult.getInfo());
+                return getList();
+            }
         }
 
-        // 构建返回结果
-        return geoResults.stream()
-                .map(geoResult -> {
-                    Long pointId = Long.parseLong(geoResult.getMember());
-                    CampusPickPointVO vo = getPickPointDetailWithCache(pointId);
-                    if (vo != null) {
-                        vo.setDistance(geoResult.getDistance().intValue());
-                    }
+        final String finalUserLng = userLng;
+        final String finalUserLat = userLat;
+
+        List<CampusPickPoint> allPoints = campusPickPointMapper.selectAllEnabled();
+
+        return allPoints.stream()
+                .filter(point -> point.getLongitude() != null && point.getLatitude() != null)
+                .map(point -> {
+                    CampusPickPointVO vo = buildCampusPickPointVO(point);
+                    long dist = amapService.calculateDistanceSingle(
+                            finalUserLng, finalUserLat,
+                            point.getLongitude().toString(), point.getLatitude().toString()
+                    );
+                    vo.setDistance(dist > 0 ? (int) dist : Integer.MAX_VALUE);
                     return vo;
                 })
-                .filter(vo -> vo != null && vo.getEnableStatus())
+                .filter(vo -> vo.getDistance() <= distance)
                 .sorted((a, b) -> a.getDistance() - b.getDistance())
                 .collect(Collectors.toList());
     }
@@ -120,14 +128,6 @@ public class CampusPickPointServiceImpl implements CampusPickPointService {
 
         campusPickPointMapper.insert(point);
 
-        // 同步到 GEO 和缓存
-        if (point.getLongitude() != null && point.getLatitude() != null) {
-            redisService.geoAdd(
-                    RedisKeyConstants.PICK_POINT_GEO_KEY,
-                    point.getLongitude().doubleValue(),
-                    point.getLatitude().doubleValue(),
-                    point.getId().toString());
-        }
         cachePickPointDetail(point);
         invalidateListCache();
 
@@ -154,19 +154,6 @@ public class CampusPickPointServiceImpl implements CampusPickPointService {
 
         campusPickPointMapper.updateById(point);
 
-        // 更新 GEO 数据
-        if (point.getLongitude() != null && point.getLatitude() != null) {
-            // 先删除旧的 GEO 数据
-            redisService.geoRemove(RedisKeyConstants.PICK_POINT_GEO_KEY, id.toString());
-            // 添加新的 GEO 数据
-            redisService.geoAdd(
-                    RedisKeyConstants.PICK_POINT_GEO_KEY,
-                    point.getLongitude().doubleValue(),
-                    point.getLatitude().doubleValue(),
-                    id.toString());
-        }
-
-        // 更新详情缓存
         CampusPickPoint updatedPoint = campusPickPointMapper.selectById(id);
         cachePickPointDetail(updatedPoint);
         invalidateListCache();
@@ -184,8 +171,6 @@ public class CampusPickPointServiceImpl implements CampusPickPointService {
 
         campusPickPointMapper.deleteById(id);
 
-        // 删除 GEO 和缓存数据
-        redisService.geoRemove(RedisKeyConstants.PICK_POINT_GEO_KEY, id.toString());
         String detailKey = RedisKeyConstants.buildPickPointDetailKey(id);
         redisService.delete(detailKey);
         invalidateListCache();
@@ -207,7 +192,6 @@ public class CampusPickPointServiceImpl implements CampusPickPointService {
 
         campusPickPointMapper.updateById(updatePoint);
 
-        // 更新详情缓存
         point.setEnableStatus(status);
         cachePickPointDetail(point);
         invalidateListCache();
@@ -225,14 +209,12 @@ public class CampusPickPointServiceImpl implements CampusPickPointService {
             allPoints = campusPickPointMapper.selectList(null);
         }
 
-        // 过滤状态
         if (status != null) {
             allPoints = allPoints.stream()
                     .filter(p -> p.getEnableStatus().equals(status))
                     .collect(Collectors.toList());
         }
 
-        // 分页
         int total = allPoints.size();
         int fromIndex = (pageNum - 1) * pageSize;
         int toIndex = Math.min(fromIndex + pageSize, total);
@@ -249,24 +231,59 @@ public class CampusPickPointServiceImpl implements CampusPickPointService {
     // ==================== 私有方法 ====================
 
     /**
+     * 通过IP获取位置（带缓存）
+     */
+    private AmapLocationResult getLocationByIp(String ip) {
+        String cacheKey = RedisKeyConstants.PICK_POINT_GEO_KEY + ":ip:" + ip;
+        String cachedLocation = redisService.get(cacheKey);
+
+        if (cachedLocation != null && !cachedLocation.isEmpty()) {
+            String[] parts = cachedLocation.split(",");
+            if (parts.length >= 2) {
+                AmapLocationResult result = new AmapLocationResult();
+                result.setStatus("1");
+                result.setLongitude(parts[0]);
+                result.setLatitude(parts[1]);
+                if (parts.length > 2) {
+                    result.setProvince(parts[2]);
+                }
+                if (parts.length > 3) {
+                    result.setCity(parts[3]);
+                }
+                return result;
+            }
+        }
+
+        AmapLocationResult result = amapService.locateByIp(ip);
+
+        if (result.isSuccess() && result.getLongitude() != null && result.getLatitude() != null) {
+            String locationCache = String.format("%s,%s,%s,%s",
+                    result.getLongitude(),
+                    result.getLatitude(),
+                    result.getProvince() != null ? result.getProvince() : "",
+                    result.getCity() != null ? result.getCity() : "");
+            redisService.set(cacheKey, locationCache, IP_LOCATION_CACHE_MINUTES, TimeUnit.MINUTES);
+        }
+
+        return result;
+    }
+
+    /**
      * 获取自提点详情（带缓存）
      */
     private CampusPickPointVO getPickPointDetailWithCache(Long id) {
         String detailKey = RedisKeyConstants.buildPickPointDetailKey(id);
 
-        // 尝试从缓存获取
         Map<String, String> cached = redisService.hGetAll(detailKey);
         if (!cached.isEmpty()) {
             return parseCachedPickPointFromHash(cached);
         }
 
-        // 从数据库获取
         CampusPickPoint point = campusPickPointMapper.selectById(id);
         if (point == null) {
             return null;
         }
 
-        // 缓存
         cachePickPointDetail(point);
 
         return buildCampusPickPointVO(point);
@@ -292,6 +309,33 @@ public class CampusPickPointServiceImpl implements CampusPickPointService {
 
         redisService.hSetAll(detailKey, map);
         redisService.expire(detailKey, DETAIL_CACHE_HOURS, TimeUnit.HOURS);
+    }
+
+    /**
+     * 缓存自提点列表
+     */
+    private void cachePickPointList(List<CampusPickPoint> points) {
+        if (points == null || points.isEmpty()) {
+            return;
+        }
+
+        String listKey = RedisKeyConstants.PICK_POINT_LIST_KEY;
+
+        for (CampusPickPoint point : points) {
+            cachePickPointDetail(point);
+
+            String listValue = String.format("%d|%s|%s|%s|%s|%s|%d",
+                    point.getId(),
+                    point.getPickPointName() != null ? point.getPickPointName() : "",
+                    point.getCampusArea() != null ? point.getCampusArea() : "",
+                    point.getDetailAddress() != null ? point.getDetailAddress() : "",
+                    point.getLongitude() != null ? point.getLongitude().toString() : "",
+                    point.getLatitude() != null ? point.getLatitude().toString() : "",
+                    point.getEnableStatus() != null ? point.getEnableStatus() : 0);
+            redisService.hSet(listKey, point.getId().toString(), listValue);
+        }
+
+        redisService.expire(listKey, LIST_CACHE_HOURS, TimeUnit.HOURS);
     }
 
     /**
@@ -322,7 +366,6 @@ public class CampusPickPointServiceImpl implements CampusPickPointService {
      * 解析缓存的自提点（列表用）
      */
     private CampusPickPointVO parseCachedPickPoint(String json) {
-        // 简化处理，实际可以使用 JSON 解析
         CampusPickPointVO vo = new CampusPickPointVO();
         String[] parts = json.split("\\|");
         if (parts.length >= 7) {
@@ -339,55 +382,6 @@ public class CampusPickPointServiceImpl implements CampusPickPointService {
             vo.setEnableStatus("1".equals(parts[6]));
         }
         return vo;
-    }
-
-    /**
-     * 同步 GEO 数据
-     */
-    private void syncGeoData() {
-        List<CampusPickPoint> points = campusPickPointMapper.selectAllEnabled();
-        syncToGeoAndCache(points);
-    }
-
-    /**
-     * 同步到 GEO 和缓存
-     */
-    private void syncToGeoAndCache(List<CampusPickPoint> points) {
-        if (points == null || points.isEmpty()) {
-            return;
-        }
-
-        Map<String, Point> geoMembers = new HashMap<>();
-        String listKey = RedisKeyConstants.PICK_POINT_LIST_KEY;
-
-        for (CampusPickPoint point : points) {
-            if (point.getLongitude() != null && point.getLatitude() != null) {
-                geoMembers.put(
-                        point.getId().toString(),
-                        new Point(point.getLongitude().doubleValue(), point.getLatitude().doubleValue()));
-            }
-
-            // 缓存详情
-            cachePickPointDetail(point);
-
-            // 缓存列表
-            String listValue = String.format("%d|%s|%s|%s|%s|%s|%d",
-                    point.getId(),
-                    point.getPickPointName() != null ? point.getPickPointName() : "",
-                    point.getCampusArea() != null ? point.getCampusArea() : "",
-                    point.getDetailAddress() != null ? point.getDetailAddress() : "",
-                    point.getLongitude() != null ? point.getLongitude().toString() : "",
-                    point.getLatitude() != null ? point.getLatitude().toString() : "",
-                    point.getEnableStatus() != null ? point.getEnableStatus() : 0);
-            redisService.hSet(listKey, point.getId().toString(), listValue);
-        }
-
-        // 批量添加 GEO 数据
-        if (!geoMembers.isEmpty()) {
-            redisService.geoAdd(RedisKeyConstants.PICK_POINT_GEO_KEY, geoMembers);
-        }
-
-        redisService.expire(listKey, LIST_CACHE_HOURS, TimeUnit.HOURS);
     }
 
     /**

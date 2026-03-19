@@ -153,12 +153,6 @@ public class UserSignServiceImpl implements UserSignService {
             throw new BusinessException("请求被中断，请重试");
         }
     }
-                .message("签到成功，获得" + rewardPoints + "积分")
-                .build();
-
-        log.info("用户签到成功, userId: {}, continuousDays: {}, rewardPoints: {}", userId, continuousDays, rewardPoints);
-        return result;
-    }
 
     @Override
     public SignStatusVO getSignStatus(Long userId) {

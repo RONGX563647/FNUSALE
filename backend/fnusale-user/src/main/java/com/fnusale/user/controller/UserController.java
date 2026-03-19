@@ -21,6 +21,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+import java.util.Map;
+
 /**
  * 用户控制器
  * 提供用户注册、登录、认证、信息管理等接口
@@ -173,6 +176,38 @@ public class UserController {
             @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") Integer pageSize) {
         Long userId = UserContext.getCurrentUserId();
         PageResult<Object> result = userService.getMyFavorites(userId, pageNum, pageSize);
+        return Result.success(result);
+    }
+
+    // ==================== 内部接口（供其他服务调用） ====================
+
+    @Operation(summary = "[内部]根据ID获取用户信息", description = "供其他服务调用，获取用户公开信息")
+    @GetMapping("/inner/{userId}")
+    public Result<UserVO> getUserByIdInner(
+            @Parameter(description = "用户ID", required = true) @PathVariable Long userId) {
+        UserVO userVO = userService.getUserById(userId);
+        return Result.success(userVO);
+    }
+
+    @Operation(summary = "[内部]获取用户认证状态", description = "供其他服务调用，获取用户认证状态")
+    @GetMapping("/inner/{userId}/auth-status")
+    public Result<String> getAuthStatusInner(
+            @Parameter(description = "用户ID", required = true) @PathVariable Long userId) {
+        UserVO userVO = userService.getUserById(userId);
+        return Result.success(userVO.getAuthStatus());
+    }
+
+    @Operation(summary = "[内部]批量获取用户信息", description = "供其他服务调用，批量获取用户信息")
+    @PostMapping("/inner/batch")
+    public Result<Map<Long, UserVO>> getUsersByIdsInner(@RequestBody List<Long> userIds) {
+        Map<Long, UserVO> result = userService.getUsersByIds(userIds);
+        return Result.success(result);
+    }
+
+    @Operation(summary = "[内部]批量获取用户认证状态", description = "供其他服务调用，批量获取用户认证状态")
+    @PostMapping("/inner/auth-status/batch")
+    public Result<Map<Long, String>> getAuthStatusByIdsInner(@RequestBody List<Long> userIds) {
+        Map<Long, String> result = userService.getAuthStatusByIds(userIds);
         return Result.success(result);
     }
 }
