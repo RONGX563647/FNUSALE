@@ -49,4 +49,10 @@ public interface UserSignRecordMapper extends BaseMapper<UserSignRecord> {
             "AND is_repair = 1 AND YEAR(sign_date) = #{year} AND MONTH(sign_date) = #{month}")
     int countRepairByUserIdAndMonth(@Param("userId") Long userId,
             @Param("year") int year, @Param("month") int month);
+
+    /**
+     * 统计某天的签到人数
+     */
+    @Select("SELECT COUNT(DISTINCT user_id) FROM t_user_sign_record WHERE sign_date = #{date}")
+    Long countByDate(@Param("date") LocalDate date);
 }

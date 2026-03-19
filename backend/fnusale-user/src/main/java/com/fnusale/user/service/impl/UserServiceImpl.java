@@ -1,6 +1,8 @@
 package com.fnusale.user.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fnusale.common.config.CampusFenceConfig;
+import com.fnusale.common.constant.RedisKeyConstants;
 import com.fnusale.common.constant.UserConstants;
 import com.fnusale.common.dto.user.UserAuthDTO;
 import com.fnusale.common.dto.user.UserLoginDTO;
@@ -9,18 +11,29 @@ import com.fnusale.common.dto.user.UserUpdateDTO;
 import com.fnusale.common.entity.User;
 import com.fnusale.common.entity.UserPoints;
 import com.fnusale.common.enums.AuthStatus;
+import com.fnusale.common.event.UserRegisterEvent;
 import com.fnusale.common.exception.BusinessException;
 import com.fnusale.common.common.PageResult;
 import com.fnusale.common.util.DesensitizeUtil;
+import com.fnusale.common.util.GeoFenceUtil;
 import com.fnusale.common.util.JwtUtil;
+import com.fnusale.common.util.UserContext;
+import com.fnusale.common.util.UserValidator;
 import com.fnusale.common.vo.user.LoginVO;
 import com.fnusale.common.vo.user.UserVO;
 import com.fnusale.user.mapper.UserMapper;
 import com.fnusale.user.mapper.UserPointsMapper;
+import com.fnusale.user.service.LoginAttemptService;
+import com.fnusale.user.service.OssService;
+import com.fnusale.user.service.UserRegisterEventPublisher;
 import com.fnusale.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.BeanUtils;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -28,11 +41,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-/**
- * 用户服务实现
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -42,114 +54,119 @@ public class UserServiceImpl implements UserService {
     private final UserPointsMapper userPointsMapper;
     private final StringRedisTemplate redisTemplate;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final RedissonClient redissonClient;
+    private final UserRegisterEventPublisher eventPublisher;
+    private final CampusFenceConfig campusFenceConfig;
+    private final OssService ossService;
+    private final LoginAttemptService loginAttemptService;
 
-    // 当前登录用户ID（通过ThreadLocal或请求上下文获取）
-    private static final ThreadLocal<Long> currentUserId = new ThreadLocal<>();
-
-    public static void setCurrentUserId(Long userId) {
-        currentUserId.set(userId);
-    }
-
-    public static Long getCurrentUserId() {
-        return currentUserId.get();
-    }
-
-    public static void clearCurrentUserId() {
-        currentUserId.remove();
-    }
+    private static final long LOCK_WAIT_TIME = 0;
+    private static final long LOCK_LEASE_TIME = 30;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void registerByPhone(UserRegisterDTO dto) {
-        // 参数校验
-        if (dto.getPhone() == null || dto.getPhone().isEmpty()) {
-            throw new BusinessException("手机号不能为空");
-        }
-        if (!dto.getPhone().matches("^1[3-9]\\d{9}$")) {
-            throw new BusinessException("手机号格式不正确");
-        }
-        // 用户名长度校验
-        if (dto.getUsername() != null && (dto.getUsername().length() < UserConstants.USERNAME_MIN_LENGTH ||
-            dto.getUsername().length() > UserConstants.USERNAME_MAX_LENGTH)) {
-            throw new BusinessException("用户名长度应在" + UserConstants.USERNAME_MIN_LENGTH + "-" + UserConstants.USERNAME_MAX_LENGTH + "个字符之间");
-        }
-        // 密码长度校验
-        if (dto.getPassword() != null && (dto.getPassword().length() < UserConstants.PASSWORD_MIN_LENGTH ||
-            dto.getPassword().length() > UserConstants.PASSWORD_MAX_LENGTH)) {
-            throw new BusinessException("密码长度应在" + UserConstants.PASSWORD_MIN_LENGTH + "-" + UserConstants.PASSWORD_MAX_LENGTH + "位之间");
-        }
+        UserValidator.validatePhone(dto.getPhone());
+        UserValidator.validateUsername(dto.getUsername());
+        UserValidator.validatePassword(dto.getPassword());
 
-        // 检查手机号是否已注册
-        if (userMapper.countByPhone(dto.getPhone()) > 0) {
-            throw new BusinessException("该手机号已被注册");
+        String lockKey = RedisKeyConstants.buildRegisterLockKey(dto.getPhone());
+        RLock lock = redissonClient.getLock(lockKey);
+
+        try {
+            boolean locked = lock.tryLock(LOCK_WAIT_TIME, LOCK_LEASE_TIME, TimeUnit.SECONDS);
+            if (!locked) {
+                throw new BusinessException("请勿重复提交注册请求");
+            }
+
+            try {
+                if (userMapper.countByPhone(dto.getPhone()) > 0) {
+                    throw new BusinessException("该手机号已被注册");
+                }
+
+                User user = User.builder()
+                        .username(dto.getUsername())
+                        .phone(dto.getPhone())
+                        .password(passwordEncoder.encode(dto.getPassword()))
+                        .identityType(dto.getIdentityType() != null ? dto.getIdentityType() : UserConstants.IDENTITY_TYPE_STUDENT)
+                        .authStatus(AuthStatus.UNAUTH.getCode())
+                        .creditScore(UserConstants.DEFAULT_CREDIT_SCORE)
+                        .locationPermission(UserConstants.LOCATION_PERMISSION_DENY)
+                        .build();
+
+                userMapper.insert(user);
+                initUserPoints(user.getId());
+                publishRegisterEvent(user, "PHONE");
+
+                log.info("用户注册成功，userId: {}, phone: {}", user.getId(), DesensitizeUtil.phone(dto.getPhone()));
+            } finally {
+                if (lock.isHeldByCurrentThread()) {
+                    lock.unlock();
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new BusinessException("注册请求被中断，请重试");
         }
-
-        // 创建用户
-        User user = User.builder()
-                .username(dto.getUsername())
-                .phone(dto.getPhone())
-                .password(passwordEncoder.encode(dto.getPassword()))
-                .identityType(dto.getIdentityType() != null ? dto.getIdentityType() : "STUDENT")
-                .authStatus(AuthStatus.UNAUTH.getCode())
-                .creditScore(UserConstants.DEFAULT_CREDIT_SCORE)
-                .locationPermission("DENY")
-                .build();
-
-        userMapper.insert(user);
-
-        // 初始化积分
-        initUserPoints(user.getId());
-
-        log.info("用户注册成功, userId: {}, phone: {}", user.getId(), DesensitizeUtil.phone(dto.getPhone()));
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void registerByEmail(UserRegisterDTO dto) {
-        // 参数校验
-        if (dto.getEmail() == null || dto.getEmail().isEmpty()) {
-            throw new BusinessException("邮箱不能为空");
-        }
-        if (!dto.getEmail().matches("^[\\w-]+(\\.[\\w-]+)*@[\\w-]+(\\.[\\w-]+)+$")) {
-            throw new BusinessException("邮箱格式不正确");
-        }
-        // 用户名长度校验
-        if (dto.getUsername() != null && (dto.getUsername().length() < UserConstants.USERNAME_MIN_LENGTH ||
-            dto.getUsername().length() > UserConstants.USERNAME_MAX_LENGTH)) {
-            throw new BusinessException("用户名长度应在" + UserConstants.USERNAME_MIN_LENGTH + "-" + UserConstants.USERNAME_MAX_LENGTH + "个字符之间");
-        }
-        // 密码长度校验
-        if (dto.getPassword() != null && (dto.getPassword().length() < UserConstants.PASSWORD_MIN_LENGTH ||
-            dto.getPassword().length() > UserConstants.PASSWORD_MAX_LENGTH)) {
-            throw new BusinessException("密码长度应在" + UserConstants.PASSWORD_MIN_LENGTH + "-" + UserConstants.PASSWORD_MAX_LENGTH + "位之间");
-        }
+        UserValidator.validateEmail(dto.getEmail());
+        UserValidator.validateUsername(dto.getUsername());
+        UserValidator.validatePassword(dto.getPassword());
 
-        // 检查邮箱是否已注册
-        if (userMapper.countByEmail(dto.getEmail()) > 0) {
-            throw new BusinessException("该邮箱已被注册");
+        String lockKey = RedisKeyConstants.buildRegisterLockKey(dto.getEmail());
+        RLock lock = redissonClient.getLock(lockKey);
+
+        try {
+            boolean locked = lock.tryLock(LOCK_WAIT_TIME, LOCK_LEASE_TIME, TimeUnit.SECONDS);
+            if (!locked) {
+                throw new BusinessException("请勿重复提交注册请求");
+            }
+
+            try {
+                if (userMapper.countByEmail(dto.getEmail()) > 0) {
+                    throw new BusinessException("该邮箱已被注册");
+                }
+
+                User user = User.builder()
+                        .username(dto.getUsername())
+                        .campusEmail(dto.getEmail())
+                        .password(passwordEncoder.encode(dto.getPassword()))
+                        .identityType(dto.getIdentityType() != null ? dto.getIdentityType() : UserConstants.IDENTITY_TYPE_STUDENT)
+                        .authStatus(AuthStatus.UNAUTH.getCode())
+                        .creditScore(UserConstants.DEFAULT_CREDIT_SCORE)
+                        .locationPermission(UserConstants.LOCATION_PERMISSION_DENY)
+                        .build();
+
+                userMapper.insert(user);
+                initUserPoints(user.getId());
+                publishRegisterEvent(user, "EMAIL");
+
+                log.info("用户注册成功，userId: {}, email: {}", user.getId(), DesensitizeUtil.email(dto.getEmail()));
+            } finally {
+                if (lock.isHeldByCurrentThread()) {
+                    lock.unlock();
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new BusinessException("注册请求被中断，请重试");
         }
-
-        // 创建用户
-        User user = User.builder()
-                .username(dto.getUsername())
-                .campusEmail(dto.getEmail())
-                .password(passwordEncoder.encode(dto.getPassword()))
-                .identityType(dto.getIdentityType() != null ? dto.getIdentityType() : "STUDENT")
-                .authStatus(AuthStatus.UNAUTH.getCode())
-                .creditScore(UserConstants.DEFAULT_CREDIT_SCORE)
-                .locationPermission("DENY")
-                .build();
-
-        userMapper.insert(user);
-
-        // 初始化积分
-        initUserPoints(user.getId());
-
-        log.info("用户注册成功, userId: {}, email: {}", user.getId(), DesensitizeUtil.email(dto.getEmail()));
     }
 
     @Override
     public LoginVO login(UserLoginDTO dto) {
+        String account = "PHONE".equals(dto.getLoginType()) ? dto.getPhone() : dto.getEmail();
+
+        // 检查是否被锁定
+        if (loginAttemptService.isLocked(account)) {
+            Long lockTime = UserConstants.LOGIN_LOCK_TIME_MINUTES;
+            throw new BusinessException("登录失败次数过多，请" + lockTime + "分钟后再试");
+        }
+
         User user = null;
 
         if ("PHONE".equals(dto.getLoginType())) {
@@ -167,23 +184,27 @@ public class UserServiceImpl implements UserService {
         }
 
         if (user == null) {
-            throw new BusinessException("用户不存在");
+            loginAttemptService.recordLoginAttempt(account);
+            Long remaining = loginAttemptService.getRemainingAttempts(account);
+            throw new BusinessException("用户不存在，剩余尝试次数：" + remaining);
         }
 
         // 验证密码
         if (!passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
-            throw new BusinessException("密码错误");
+            loginAttemptService.recordLoginAttempt(account);
+            Long remaining = loginAttemptService.getRemainingAttempts(account);
+            throw new BusinessException("密码错误，剩余尝试次数：" + remaining);
         }
 
-        // 生成Token
+        // 登录成功，清除失败记录
+        loginAttemptService.clearLoginAttempts(account);
+
         String accessToken = JwtUtil.generateAccessToken(user.getId(), user.getUsername(), user.getIdentityType());
         String refreshToken = JwtUtil.generateRefreshToken(user.getId());
 
-        // 缓存Token到Redis
         String tokenKey = UserConstants.TOKEN_KEY_PREFIX + user.getId();
         redisTemplate.opsForValue().set(tokenKey, accessToken, UserConstants.CAPTCHA_EXPIRATION * 24, TimeUnit.SECONDS);
 
-        // 构建返回对象
         LoginVO loginVO = LoginVO.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
@@ -192,23 +213,22 @@ public class UserServiceImpl implements UserService {
                 .userInfo(buildUserVO(user))
                 .build();
 
-        log.info("用户登录成功, userId: {}", user.getId());
+        log.info("用户登录成功，userId: {}", user.getId());
         return loginVO;
     }
 
     @Override
     public void logout() {
-        Long userId = getCurrentUserId();
+        Long userId = UserContext.getCurrentUserId();
         if (userId != null) {
             String tokenKey = UserConstants.TOKEN_KEY_PREFIX + userId;
             redisTemplate.delete(tokenKey);
-            log.info("用户登出成功, userId: {}", userId);
+            log.info("用户登出成功，userId: {}", userId);
         }
     }
 
     @Override
     public LoginVO refreshToken(String refreshToken) {
-        // 验证refreshToken
         if (!JwtUtil.validateToken(refreshToken)) {
             throw new BusinessException("刷新令牌无效或已过期");
         }
@@ -223,17 +243,14 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException("令牌解析失败");
         }
 
-        // 查询用户
         User user = userMapper.selectById(userId);
         if (user == null) {
             throw new BusinessException("用户不存在");
         }
 
-        // 生成新的Token
         String newAccessToken = JwtUtil.generateAccessToken(user.getId(), user.getUsername(), user.getIdentityType());
         String newRefreshToken = JwtUtil.generateRefreshToken(user.getId());
 
-        // 更新Redis缓存
         String tokenKey = UserConstants.TOKEN_KEY_PREFIX + user.getId();
         redisTemplate.opsForValue().set(tokenKey, newAccessToken, UserConstants.CAPTCHA_EXPIRATION * 24, TimeUnit.SECONDS);
 
@@ -249,39 +266,44 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserVO getCurrentUserInfo() {
-        Long userId = getCurrentUserId();
-        if (userId == null) {
-            throw new BusinessException("用户未登录");
-        }
+        Long userId = UserContext.getUserIdOrThrow();
+        return getUserVOById(userId);
+    }
 
+    /**
+     * 根据用户ID获取用户VO（带缓存）
+     */
+    @Cacheable(value = "userInfo", key = "#userId", unless = "#result == null")
+    public UserVO getUserVOById(Long userId) {
         User user = userMapper.selectById(userId);
         if (user == null) {
             throw new BusinessException("用户不存在");
         }
-
         return buildUserVO(user);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateUserInfo(UserUpdateDTO dto) {
-        Long userId = getCurrentUserId();
-        if (userId == null) {
-            throw new BusinessException("用户未登录");
+        Long userId = UserContext.getUserIdOrThrow();
+
+        User oldUser = userMapper.selectById(userId);
+        if (oldUser == null) {
+            throw new BusinessException("用户不存在");
         }
 
         User user = new User();
         user.setId(userId);
 
         if (dto.getUsername() != null && !dto.getUsername().isEmpty()) {
-            if (dto.getUsername().length() < UserConstants.USERNAME_MIN_LENGTH ||
-                dto.getUsername().length() > UserConstants.USERNAME_MAX_LENGTH) {
-                throw new BusinessException("用户名长度应在" + UserConstants.USERNAME_MIN_LENGTH + "-" + UserConstants.USERNAME_MAX_LENGTH + "个字符之间");
-            }
+            UserValidator.validateUsername(dto.getUsername());
             user.setUsername(dto.getUsername());
         }
 
         if (dto.getAvatarUrl() != null) {
+            if (oldUser.getAvatarUrl() != null && !oldUser.getAvatarUrl().equals(dto.getAvatarUrl())) {
+                ossService.deleteFile(oldUser.getAvatarUrl());
+            }
             user.setAvatarUrl(dto.getAvatarUrl());
         }
 
@@ -295,34 +317,28 @@ public class UserServiceImpl implements UserService {
 
         userMapper.updateById(user);
 
-        log.info("用户信息更新成功, userId: {}", userId);
+        // 清除缓存
+        evictUserCache(userId);
+
+        log.info("用户信息更新成功，userId: {}", userId);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updatePassword(String oldPassword, String newPassword) {
-        Long userId = getCurrentUserId();
-        if (userId == null) {
-            throw new BusinessException("用户未登录");
-        }
+        Long userId = UserContext.getUserIdOrThrow();
 
         User user = userMapper.selectById(userId);
         if (user == null) {
             throw new BusinessException("用户不存在");
         }
 
-        // 验证旧密码
         if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
             throw new BusinessException("原密码错误");
         }
 
-        // 验证新密码格式
-        if (newPassword.length() < UserConstants.PASSWORD_MIN_LENGTH ||
-            newPassword.length() > UserConstants.PASSWORD_MAX_LENGTH) {
-            throw new BusinessException("密码长度应在" + UserConstants.PASSWORD_MIN_LENGTH + "-" + UserConstants.PASSWORD_MAX_LENGTH + "位之间");
-        }
+        UserValidator.validatePassword(newPassword);
 
-        // 更新密码
         User updateUser = User.builder()
                 .id(userId)
                 .password(passwordEncoder.encode(newPassword))
@@ -330,59 +346,76 @@ public class UserServiceImpl implements UserService {
 
         userMapper.updateById(updateUser);
 
-        log.info("用户密码修改成功, userId: {}", userId);
+        // 清除缓存
+        evictUserCache(userId);
+
+        log.info("用户密码修改成功，userId: {}", userId);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void submitAuth(UserAuthDTO dto) {
-        Long userId = getCurrentUserId();
-        if (userId == null) {
-            throw new BusinessException("用户未登录");
-        }
+        Long userId = UserContext.getUserIdOrThrow();
 
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            throw new BusinessException("用户不存在");
-        }
+        // 使用学号/工号作为锁，防止并发占用
+        String lockKey = "auth:studentTeacherId:" + dto.getStudentTeacherId();
+        RLock lock = redissonClient.getLock(lockKey);
 
-        // 检查是否已认证或审核中
-        if (AuthStatus.AUTH_SUCCESS.getCode().equals(user.getAuthStatus())) {
-            throw new BusinessException("您已完成身份认证");
-        }
-        if (AuthStatus.UNDER_REVIEW.getCode().equals(user.getAuthStatus())) {
-            throw new BusinessException("认证申请审核中，请耐心等待");
-        }
-
-        // 检查学号/工号是否已被使用
-        if (userMapper.countByStudentTeacherId(dto.getStudentTeacherId()) > 0) {
-            User existUser = userMapper.selectByStudentTeacherId(dto.getStudentTeacherId());
-            if (existUser != null && !existUser.getId().equals(userId)) {
-                throw new BusinessException("该学号/工号已被其他用户使用");
+        try {
+            boolean locked = lock.tryLock(LOCK_WAIT_TIME, LOCK_LEASE_TIME, TimeUnit.SECONDS);
+            if (!locked) {
+                throw new BusinessException("系统繁忙，请稍后重试");
             }
+
+            try {
+                User user = userMapper.selectById(userId);
+                if (user == null) {
+                    throw new BusinessException("用户不存在");
+                }
+
+                if (AuthStatus.AUTH_SUCCESS.getCode().equals(user.getAuthStatus())) {
+                    throw new BusinessException("您已完成身份认证");
+                }
+                if (AuthStatus.UNDER_REVIEW.getCode().equals(user.getAuthStatus())) {
+                    throw new BusinessException("认证申请审核中，请耐心等待");
+                }
+
+                if (userMapper.countByStudentTeacherId(dto.getStudentTeacherId()) > 0) {
+                    User existUser = userMapper.selectByStudentTeacherId(dto.getStudentTeacherId());
+                    if (existUser != null && !existUser.getId().equals(userId)) {
+                        throw new BusinessException("该学号/工号已被其他用户使用");
+                    }
+                }
+
+                User updateUser = User.builder()
+                        .id(userId)
+                        .studentTeacherId(dto.getStudentTeacherId())
+                        .identityType(dto.getIdentityType())
+                        .authImageUrl(dto.getAuthImageUrl())
+                        .authStatus(AuthStatus.UNDER_REVIEW.getCode())
+                        .build();
+
+                userMapper.updateById(updateUser);
+
+                // 清除缓存
+                evictUserCache(userId);
+
+                log.info("用户提交身份认证，userId: {}, studentTeacherId: {}", userId,
+                        DesensitizeUtil.studentTeacherId(dto.getStudentTeacherId()));
+            } finally {
+                if (lock.isHeldByCurrentThread()) {
+                    lock.unlock();
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new BusinessException("请求被中断，请重试");
         }
-
-        // 更新认证信息
-        User updateUser = User.builder()
-                .id(userId)
-                .studentTeacherId(dto.getStudentTeacherId())
-                .identityType(dto.getIdentityType())
-                .authImageUrl(dto.getAuthImageUrl())
-                .authStatus(AuthStatus.UNDER_REVIEW.getCode())
-                .build();
-
-        userMapper.updateById(updateUser);
-
-        log.info("用户提交身份认证, userId: {}, studentTeacherId: {}", userId,
-                DesensitizeUtil.studentTeacherId(dto.getStudentTeacherId()));
     }
 
     @Override
     public UserVO getAuthStatus() {
-        Long userId = getCurrentUserId();
-        if (userId == null) {
-            throw new BusinessException("用户未登录");
-        }
+        Long userId = UserContext.getUserIdOrThrow();
 
         User user = userMapper.selectById(userId);
         if (user == null) {
@@ -394,32 +427,15 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserVO getUserById(Long userId) {
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            throw new BusinessException("用户不存在");
-        }
-
-        return UserVO.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .identityType(user.getIdentityType())
-                .authStatus(user.getAuthStatus())
-                .creditScore(user.getCreditScore())
-                .avatarUrl(user.getAvatarUrl())
-                .build();
+        return getUserVOById(userId);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateLocationPermission(String permission) {
-        Long userId = getCurrentUserId();
-        if (userId == null) {
-            throw new BusinessException("用户未登录");
-        }
+        Long userId = UserContext.getUserIdOrThrow();
 
-        if (!"ALLOW".equals(permission) && !"DENY".equals(permission)) {
-            throw new BusinessException("定位权限状态不正确");
-        }
+        UserValidator.validateLocationPermission(permission);
 
         User user = User.builder()
                 .id(userId)
@@ -428,40 +444,68 @@ public class UserServiceImpl implements UserService {
 
         userMapper.updateById(user);
 
-        log.info("用户更新定位权限, userId: {}, permission: {}", userId, permission);
+        // 清除缓存
+        evictUserCache(userId);
+
+        log.info("用户更新定位权限，userId: {}, permission: {}", userId, permission);
     }
 
     @Override
     public boolean verifyLocation(String longitude, String latitude) {
-        // TODO: 实现校园围栏验证
-        // 1. 从t_system_config读取校园围栏坐标
-        // 2. 使用Haversine公式或高德地图API验证
-        // 当前默认返回true
-        log.info("校验定位, longitude: {}, latitude: {}", longitude, latitude);
-        return true;
+        // 检查配置是否启用
+        if (!Boolean.TRUE.equals(campusFenceConfig.getEnabled())) {
+            log.warn("校园围栏验证未启用，默认通过");
+            return true;
+        }
+
+        try {
+            double lon = Double.parseDouble(longitude);
+            double lat = Double.parseDouble(latitude);
+
+            // 1. 优先使用多边形围栏验证
+            List<GeoFenceUtil.Point> fencePoints = campusFenceConfig.getFencePoints();
+            if (fencePoints != null && !fencePoints.isEmpty()) {
+                boolean inPolygon = GeoFenceUtil.isPointInPolygon(lon, lat, fencePoints);
+                log.info("校园围栏验证结果：经度={}, 纬度={}, 是否在多边形内={}", lon, lat, inPolygon);
+                return inPolygon;
+            }
+
+            // 2. 备用圆形围栏验证
+            GeoFenceUtil.Point center = campusFenceConfig.getCenterPoint();
+            Double radius = campusFenceConfig.getRadius();
+            if (center != null && radius != null) {
+                boolean inCircle = GeoFenceUtil.isPointInCircle(lon, lat, 
+                    center.getLongitude(), center.getLatitude(), radius);
+                log.info("校园圆形围栏验证结果：经度={}, 纬度={}, 是否在圆形内={}", lon, lat, inCircle);
+                return inCircle;
+            }
+
+            log.warn("未配置校园围栏坐标，默认通过验证");
+            return true;
+        } catch (NumberFormatException e) {
+            log.error("经纬度格式错误：longitude={}, latitude={}", longitude, latitude);
+            throw new BusinessException("经纬度格式不正确");
+        } catch (Exception e) {
+            log.error("校园围栏验证失败", e);
+            throw new BusinessException("定位验证失败，请重试");
+        }
     }
 
     @Override
     public PageResult<Object> getMyProducts(Long userId, Integer pageNum, Integer pageSize) {
-        // TODO: 调用商品服务获取用户发布的商品
         return new PageResult<>(pageNum, pageSize, 0, Collections.emptyList());
     }
 
     @Override
     public PageResult<Object> getMyOrders(Long userId, String status, Integer pageNum, Integer pageSize) {
-        // TODO: 调用交易服务获取用户订单
         return new PageResult<>(pageNum, pageSize, 0, Collections.emptyList());
     }
 
     @Override
     public PageResult<Object> getMyFavorites(Long userId, Integer pageNum, Integer pageSize) {
-        // TODO: 调用商品服务获取用户收藏
         return new PageResult<>(pageNum, pageSize, 0, Collections.emptyList());
     }
 
-    /**
-     * 初始化用户积分
-     */
     private void initUserPoints(Long userId) {
         UserPoints userPoints = UserPoints.builder()
                 .userId(userId)
@@ -474,13 +518,24 @@ public class UserServiceImpl implements UserService {
         userPointsMapper.insert(userPoints);
     }
 
-    /**
-     * 构建用户VO（脱敏）
-     */
+    private void publishRegisterEvent(User user, String registerSource) {
+        UserRegisterEvent event = UserRegisterEvent.builder()
+                .userId(user.getId())
+                .username(user.getUsername())
+                .phone(user.getPhone())
+                .email(user.getCampusEmail())
+                .identityType(user.getIdentityType())
+                .registerSource(registerSource)
+                .registerTime(LocalDateTime.now())
+                .eventId(UUID.randomUUID().toString())
+                .build();
+
+        eventPublisher.publishRegisterEvent(event);
+    }
+
     private UserVO buildUserVO(User user) {
         UserVO vo = new UserVO();
         BeanUtils.copyProperties(user, vo);
-        // 处理需要脱敏的字段
         if (user.getStudentTeacherId() != null) {
             vo.setStudentTeacherId(DesensitizeUtil.studentTeacherId(user.getStudentTeacherId()));
         }
@@ -491,5 +546,13 @@ public class UserServiceImpl implements UserService {
             vo.setCampusEmail(DesensitizeUtil.email(user.getCampusEmail()));
         }
         return vo;
+    }
+
+    /**
+     * 清除用户缓存
+     */
+    @CacheEvict(value = "userInfo", key = "#userId")
+    private void evictUserCache(Long userId) {
+        log.debug("清除用户缓存，userId: {}", userId);
     }
 }

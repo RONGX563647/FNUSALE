@@ -3,134 +3,71 @@ package com.fnusale.user.service.impl;
 import com.fnusale.common.common.PageResult;
 import com.fnusale.common.entity.RankingRecord;
 import com.fnusale.common.entity.RankingRewardLog;
-import com.fnusale.common.entity.User;
-import com.fnusale.common.entity.UserRating;
 import com.fnusale.common.exception.BusinessException;
 import com.fnusale.common.vo.user.MyRankingVO;
 import com.fnusale.common.vo.user.RankingRewardVO;
 import com.fnusale.common.vo.user.RankingUserVO;
 import com.fnusale.user.mapper.RankingRecordMapper;
 import com.fnusale.user.mapper.RankingRewardLogMapper;
-import com.fnusale.user.mapper.UserMapper;
-import com.fnusale.user.mapper.UserRatingMapper;
+import com.fnusale.user.service.RankingCacheService;
 import com.fnusale.user.service.RankingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
  * 排行榜服务实现
+ * 基于 Redis ZSET 实现实时排行榜
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class RankingServiceImpl implements RankingService {
 
+    private final RankingCacheService rankingCacheService;
     private final RankingRecordMapper rankingRecordMapper;
     private final RankingRewardLogMapper rankingRewardLogMapper;
-    private final UserMapper userMapper;
-    private final UserRatingMapper userRatingMapper;
-    private final StringRedisTemplate redisTemplate;
 
     private static final int RANKING_LIMIT = 100;
-    private static final String RANKING_CACHE_PREFIX = "ranking:";
-    private static final long CACHE_EXPIRE_HOURS = 1;
+    private static final int REWARD_TOP_N = 10; // 前N名有奖励
 
     @Override
     public List<RankingUserVO> getActivityRanking(String type, String date) {
-        LocalDate rankDate = parseRankDate(type, date);
-        String cacheKey = RANKING_CACHE_PREFIX + "activity:" + type + ":" + rankDate;
-
-        // 尝试从缓存获取
-        String cachedRank = redisTemplate.opsForValue().get(cacheKey);
-        if (cachedRank != null) {
-            return parseCachedRanking(cachedRank, "ACTIVITY");
-        }
-
-        // 从数据库获取
-        List<RankingRecord> records = rankingRecordMapper.selectByTypeAndDate("ACTIVITY", rankDate, RANKING_LIMIT);
-        List<RankingUserVO> result = buildRankingUserVOList(records, "ACTIVITY");
-
-        // 缓存结果
-        cacheRankingResult(cacheKey, result);
-
-        return result;
+        String period = convertTypeToPeriod(type);
+        return rankingCacheService.getTopN("ACTIVITY", period, RANKING_LIMIT);
     }
 
     @Override
     public List<RankingUserVO> getTradeRanking(String type, String date) {
-        LocalDate rankDate = parseRankDate(type, date);
-        String cacheKey = RANKING_CACHE_PREFIX + "trade:" + type + ":" + rankDate;
-
-        String cachedRank = redisTemplate.opsForValue().get(cacheKey);
-        if (cachedRank != null) {
-            return parseCachedRanking(cachedRank, "TRADE");
-        }
-
-        List<RankingRecord> records = rankingRecordMapper.selectByTypeAndDate("TRADE", rankDate, RANKING_LIMIT);
-        List<RankingUserVO> result = buildRankingUserVOList(records, "TRADE");
-
-        cacheRankingResult(cacheKey, result);
-
-        return result;
+        String period = convertTypeToPeriod(type);
+        return rankingCacheService.getTopN("TRADE", period, RANKING_LIMIT);
     }
 
     @Override
     public List<RankingUserVO> getCreditRanking() {
-        String cacheKey = RANKING_CACHE_PREFIX + "credit:current";
-
-        String cachedRank = redisTemplate.opsForValue().get(cacheKey);
-        if (cachedRank != null) {
-            return parseCachedRanking(cachedRank, "CREDIT");
-        }
-
-        // 信誉排行从用户表直接查询
-        List<RankingRecord> records = rankingRecordMapper.selectByTypeAndDate("CREDIT", LocalDate.now(), RANKING_LIMIT);
-        List<RankingUserVO> result = buildRankingUserVOList(records, "CREDIT");
-
-        cacheRankingResult(cacheKey, result);
-
-        return result;
+        return rankingCacheService.getTopN("CREDIT", null, RANKING_LIMIT);
     }
 
     @Override
     public List<RankingUserVO> getRatingRanking() {
-        String cacheKey = RANKING_CACHE_PREFIX + "rating:current";
-
-        String cachedRank = redisTemplate.opsForValue().get(cacheKey);
-        if (cachedRank != null) {
-            return parseCachedRanking(cachedRank, "RATING");
-        }
-
-        List<RankingRecord> records = rankingRecordMapper.selectByTypeAndDate("RATING", LocalDate.now(), RANKING_LIMIT);
-        List<RankingUserVO> result = buildRankingUserVOList(records, "RATING");
-
-        cacheRankingResult(cacheKey, result);
-
-        return result;
+        return rankingCacheService.getTopN("RATING", null, RANKING_LIMIT);
     }
 
     @Override
     public MyRankingVO getMyRanking(Long userId) {
-        LocalDate today = LocalDate.now();
-
         return MyRankingVO.builder()
-                .activity(getUserRankInfo(userId, "ACTIVITY", today))
-                .trade(getUserRankInfo(userId, "TRADE", today))
-                .credit(getUserRankInfo(userId, "CREDIT", today))
-                .rating(getUserRankInfo(userId, "RATING", today))
-                .build();
+            .activity(getUserRankInfo(userId, "ACTIVITY", "daily"))
+            .trade(getUserRankInfo(userId, "TRADE", "daily"))
+            .credit(getUserRankInfo(userId, "CREDIT", null))
+            .rating(getUserRankInfo(userId, "RATING", null))
+            .build();
     }
 
     @Override
@@ -138,11 +75,11 @@ public class RankingServiceImpl implements RankingService {
         List<RankingRecord> records = rankingRecordMapper.selectHistoryByTypeAndUser(rankType, userId);
 
         List<RankingUserVO> voList = records.stream()
-                .map(record -> RankingUserVO.builder()
-                        .rank(record.getRankPosition())
-                        .score(record.getScore())
-                        .build())
-                .collect(Collectors.toList());
+            .map(record -> RankingUserVO.builder()
+                .rank(record.getRankPosition())
+                .score(record.getScore())
+                .build())
+            .collect(Collectors.toList());
 
         // 分页处理
         int total = voList.size();
@@ -150,7 +87,7 @@ public class RankingServiceImpl implements RankingService {
         int toIndex = Math.min(fromIndex + pageSize, total);
 
         List<RankingUserVO> pageList = fromIndex < total ?
-                voList.subList(fromIndex, toIndex) : Collections.emptyList();
+            voList.subList(fromIndex, toIndex) : Collections.emptyList();
 
         return new PageResult<>(pageNum, pageSize, total, pageList);
     }
@@ -182,14 +119,14 @@ public class RankingServiceImpl implements RankingService {
         if (rewardLog.getRewardPoints() != null && rewardLog.getRewardPoints() > 0) {
             // TODO: 调用积分服务增加积分
             log.info("用户领取排行奖励, userId: {}, rewardId: {}, points: {}",
-                    userId, rewardId, rewardLog.getRewardPoints());
+                userId, rewardId, rewardLog.getRewardPoints());
         }
 
         // 发放优惠券奖励
         if (rewardLog.getRewardCouponId() != null) {
             // TODO: 调用营销服务发放优惠券
             log.info("用户领取排行优惠券奖励, userId: {}, rewardId: {}, couponId: {}",
-                    userId, rewardId, rewardLog.getRewardCouponId());
+                userId, rewardId, rewardLog.getRewardCouponId());
         }
     }
 
@@ -205,127 +142,76 @@ public class RankingServiceImpl implements RankingService {
         }
 
         return logs.stream()
-                .map(this::buildRankingRewardVO)
-                .collect(Collectors.toList());
+            .map(this::buildRankingRewardVO)
+            .collect(Collectors.toList());
     }
 
-    /**
-     * 解析排行日期
-     */
-    private LocalDate parseRankDate(String type, String date) {
-        if (date != null && !date.isEmpty()) {
-            return LocalDate.parse(date, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-        }
+    // ==================== 分数更新方法 ====================
 
-        LocalDate today = LocalDate.now();
+    @Override
+    public void incrementActivityScore(Long userId, double score) {
+        // 同时更新日榜、周榜、月榜
+        rankingCacheService.incrementScore("ACTIVITY", "daily", userId, score);
+        rankingCacheService.incrementScore("ACTIVITY", "weekly", userId, score);
+        rankingCacheService.incrementScore("ACTIVITY", "monthly", userId, score);
+        log.debug("活跃度分数增加: userId={}, score={}", userId, score);
+    }
+
+    @Override
+    public void incrementTradeScore(Long userId, double amount) {
+        rankingCacheService.incrementScore("TRADE", "daily", userId, amount);
+        rankingCacheService.incrementScore("TRADE", "weekly", userId, amount);
+        rankingCacheService.incrementScore("TRADE", "monthly", userId, amount);
+        log.debug("交易分数增加: userId={}, amount={}", userId, amount);
+    }
+
+    @Override
+    public void updateCreditScore(Long userId, double score) {
+        // 信誉分直接设置，不是累加
+        rankingCacheService.setScore("CREDIT", null, userId, score);
+        log.debug("信誉分更新: userId={}, score={}", userId, score);
+    }
+
+    @Override
+    public void updateRatingScore(Long userId, double rating) {
+        // 评分直接设置
+        rankingCacheService.setScore("RATING", null, userId, rating);
+        log.debug("评分更新: userId={}, rating={}", userId, rating);
+    }
+
+    // ==================== 私有方法 ====================
+
+    /**
+     * 转换排行类型到周期
+     */
+    private String convertTypeToPeriod(String type) {
         return switch (type) {
-            case "weekly" -> today.minusWeeks(1);
-            case "monthly" -> today.minusMonths(1);
-            default -> today;
+            case "weekly" -> "weekly";
+            case "monthly" -> "monthly";
+            default -> "daily";
         };
     }
 
     /**
      * 获取用户排名信息
      */
-    private MyRankingVO.RankingInfo getUserRankInfo(Long userId, String rankType, LocalDate date) {
-        RankingRecord record = rankingRecordMapper.selectByTypeDateAndUser(rankType, date, userId);
+    private MyRankingVO.RankingInfo getUserRankInfo(Long userId, String rankType, String period) {
+        Long rank = rankingCacheService.getUserRank(rankType, period, userId);
+        BigDecimal score = rankingCacheService.getUserScore(rankType, period, userId);
 
-        if (record != null) {
+        if (rank != null && score != null) {
             return MyRankingVO.RankingInfo.builder()
-                    .rank(record.getRankPosition())
-                    .score(record.getScore() != null ? record.getScore().toString() : "0")
-                    .inList(record.getRankPosition() <= RANKING_LIMIT)
-                    .build();
+                .rank(rank.intValue())
+                .score(score.toString())
+                .inList(rank <= RANKING_LIMIT)
+                .build();
         } else {
             return MyRankingVO.RankingInfo.builder()
-                    .rank(null)
-                    .score("0")
-                    .inList(false)
-                    .build();
+                .rank(null)
+                .score("0")
+                .inList(false)
+                .build();
         }
-    }
-
-    /**
-     * 构建排行用户VO列表
-     */
-    private List<RankingUserVO> buildRankingUserVOList(List<RankingRecord> records, String rankType) {
-        if (records.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        return records.stream()
-                .map(record -> {
-                    RankingUserVO.RankingUserVOBuilder builder = RankingUserVO.builder()
-                            .rank(record.getRankPosition())
-                            .userId(record.getUserId())
-                            .score(record.getScore());
-
-                    // 查询用户信息
-                    User user = userMapper.selectById(record.getUserId());
-                    if (user != null) {
-                        builder.username(user.getUsername())
-                                .avatarUrl(user.getAvatarUrl())
-                                .creditScore(user.getCreditScore());
-                    }
-
-                    // 查询评分信息
-                    if ("RATING".equals(rankType) || "CREDIT".equals(rankType)) {
-                        UserRating rating = userRatingMapper.selectByUserId(record.getUserId());
-                        if (rating != null) {
-                            builder.rating(rating.getOverallRating());
-                        }
-                    }
-
-                    return builder.build();
-                })
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * 缓存排行结果
-     */
-    private void cacheRankingResult(String key, List<RankingUserVO> result) {
-        try {
-            StringBuilder sb = new StringBuilder();
-            for (RankingUserVO vo : result) {
-                sb.append(vo.getUserId()).append(",")
-                        .append(vo.getRank()).append(",")
-                        .append(vo.getScore()).append(";");
-            }
-            redisTemplate.opsForValue().set(key, sb.toString(), CACHE_EXPIRE_HOURS, TimeUnit.HOURS);
-        } catch (Exception e) {
-            log.warn("缓存排行数据失败", e);
-        }
-    }
-
-    /**
-     * 解析缓存的排行数据
-     */
-    private List<RankingUserVO> parseCachedRanking(String cached, String rankType) {
-        List<RankingUserVO> result = new ArrayList<>();
-        String[] items = cached.split(";");
-        for (String item : items) {
-            if (item.isEmpty()) continue;
-            String[] parts = item.split(",");
-            if (parts.length >= 3) {
-                RankingUserVO.RankingUserVOBuilder builder = RankingUserVO.builder()
-                        .userId(Long.parseLong(parts[0]))
-                        .rank(Integer.parseInt(parts[1]))
-                        .score(new BigDecimal(parts[2]));
-
-                // 补充用户信息
-                User user = userMapper.selectById(Long.parseLong(parts[0]));
-                if (user != null) {
-                    builder.username(user.getUsername())
-                            .avatarUrl(user.getAvatarUrl())
-                            .creditScore(user.getCreditScore());
-                }
-
-                result.add(builder.build());
-            }
-        }
-        return result;
     }
 
     /**
@@ -333,14 +219,14 @@ public class RankingServiceImpl implements RankingService {
      */
     private RankingRewardVO buildRankingRewardVO(RankingRewardLog log) {
         RankingRewardVO.RankingRewardVOBuilder builder = RankingRewardVO.builder()
-                .id(log.getId())
-                .rankType(log.getRankType())
-                .rankTypeName(getRankTypeName(log.getRankType()))
-                .rankDate(log.getRankDate())
-                .rankPosition(log.getRankPosition())
-                .rewardPoints(log.getRewardPoints())
-                .rewardCouponId(log.getRewardCouponId())
-                .isClaimed(log.getIsClaimed() == 1);
+            .id(log.getId())
+            .rankType(log.getRankType())
+            .rankTypeName(getRankTypeName(log.getRankType()))
+            .rankDate(log.getRankDate())
+            .rankPosition(log.getRankPosition())
+            .rewardPoints(log.getRewardPoints())
+            .rewardCouponId(log.getRewardCouponId())
+            .isClaimed(log.getIsClaimed() == 1);
 
         // TODO: 查询优惠券名称
         if (log.getRewardCouponId() != null) {

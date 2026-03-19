@@ -71,4 +71,34 @@ public interface RankingService {
      * @return 奖励列表
      */
     List<RankingRewardVO> getMyRewards(Long userId, Boolean isClaimed);
+
+    // ==================== 分数更新方法（实时排行榜） ====================
+
+    /**
+     * 增加活跃度分数
+     * @param userId 用户ID
+     * @param score 增加的分数
+     */
+    void incrementActivityScore(Long userId, double score);
+
+    /**
+     * 增加交易分数
+     * @param userId 用户ID
+     * @param amount 交易金额
+     */
+    void incrementTradeScore(Long userId, double amount);
+
+    /**
+     * 更新信誉分
+     * @param userId 用户ID
+     * @param score 信誉分
+     */
+    void updateCreditScore(Long userId, double score);
+
+    /**
+     * 更新评分
+     * @param userId 用户ID
+     * @param rating 评分值
+     */
+    void updateRatingScore(Long userId, double rating);
 }

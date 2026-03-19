@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fnusale.admin.mapper.UserMapper;
+import com.fnusale.admin.service.AdminEventPublisher;
 import com.fnusale.admin.service.AdminUserService;
 import com.fnusale.admin.service.SystemLogService;
 import com.fnusale.common.common.PageResult;
@@ -13,12 +14,16 @@ import com.fnusale.common.entity.User;
 import com.fnusale.common.enums.AuthStatus;
 import com.fnusale.common.enums.LogModule;
 import com.fnusale.common.enums.OperateType;
+import com.fnusale.common.event.UserAuthAuditEvent;
+import com.fnusale.common.event.UserBanEvent;
 import com.fnusale.common.exception.BusinessException;
 import com.fnusale.common.vo.admin.UserDetailVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.UUID;
 
 /**
  * 用户管理服务实现
@@ -30,6 +35,7 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     private final UserMapper userMapper;
     private final SystemLogService systemLogService;
+    private final AdminEventPublisher eventPublisher;
 
     @Override
     public PageResult<UserDetailVO> getUserPage(UserQueryDTO query) {
@@ -83,6 +89,16 @@ public class AdminUserServiceImpl implements AdminUserService {
         systemLogService.log(adminId, LogModule.USER.getCode(), OperateType.UPDATE.getCode(),
                 "认证通过用户ID:" + userId, null, null);
 
+        // 发布认证审核事件
+        UserAuthAuditEvent event = UserAuthAuditEvent.builder()
+                .userId(userId)
+                .username(user.getUsername())
+                .auditResult("PASS")
+                .auditTime(java.time.LocalDateTime.now())
+                .eventId(UUID.randomUUID().toString())
+                .build();
+        eventPublisher.publishUserAuthAuditEvent(event);
+
         log.info("用户认证通过, userId: {}, adminId: {}", userId, adminId);
     }
 
@@ -106,6 +122,17 @@ public class AdminUserServiceImpl implements AdminUserService {
         systemLogService.log(adminId, LogModule.USER.getCode(), OperateType.UPDATE.getCode(),
                 "认证驳回用户ID:" + userId + ", 原因:" + reason, null, null);
 
+        // 发布认证审核事件
+        UserAuthAuditEvent event = UserAuthAuditEvent.builder()
+                .userId(userId)
+                .username(user.getUsername())
+                .auditResult("REJECT")
+                .rejectReason(reason)
+                .auditTime(java.time.LocalDateTime.now())
+                .eventId(UUID.randomUUID().toString())
+                .build();
+        eventPublisher.publishUserAuthAuditEvent(event);
+
         log.info("用户认证驳回, userId: {}, adminId: {}, reason: {}", userId, adminId, reason);
     }
 
@@ -126,6 +153,17 @@ public class AdminUserServiceImpl implements AdminUserService {
         systemLogService.log(adminId, LogModule.USER.getCode(), OperateType.UPDATE.getCode(),
                 "封禁用户ID:" + userId + ", 原因:" + reason, null, null);
 
+        // 发布封禁事件
+        UserBanEvent event = UserBanEvent.builder()
+                .userId(userId)
+                .username(user.getUsername())
+                .operateType("BAN")
+                .reason(reason)
+                .operateTime(java.time.LocalDateTime.now())
+                .eventId(UUID.randomUUID().toString())
+                .build();
+        eventPublisher.publishUserBanEvent(event);
+
         log.info("封禁用户, userId: {}, adminId: {}, reason: {}", userId, adminId, reason);
     }
 
@@ -145,6 +183,16 @@ public class AdminUserServiceImpl implements AdminUserService {
 
         systemLogService.log(adminId, LogModule.USER.getCode(), OperateType.UPDATE.getCode(),
                 "解封用户ID:" + userId, null, null);
+
+        // 发布解封事件
+        UserBanEvent event = UserBanEvent.builder()
+                .userId(userId)
+                .username(user.getUsername())
+                .operateType("UNBAN")
+                .operateTime(java.time.LocalDateTime.now())
+                .eventId(UUID.randomUUID().toString())
+                .build();
+        eventPublisher.publishUserBanEvent(event);
 
         log.info("解封用户, userId: {}, adminId: {}", userId, adminId);
     }

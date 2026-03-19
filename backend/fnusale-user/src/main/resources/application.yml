@@ -8,17 +8,6 @@ spring:
     active: dev
   config:
     import: "optional:nacos"
-  cloud:
-    nacos:
-      discovery:
-        server-addr: ${NACOS_HOST:localhost}:${NACOS_PORT:8848}
-        namespace: ${NACOS_NAMESPACE:}
-        group: ${NACOS_GROUP:DEFAULT_GROUP}
-        username: ${NACOS_USERNAME:nacos}
-        password: ${NACOS_PASSWORD:nacos}
-        enabled: ${NACOS_ENABLED:true}
-      config:
-        enabled: false
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3307}/${MYSQL_DATABASE:fnusale}?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
@@ -30,12 +19,60 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:redis123456}
       database: 0
+    mail:
+    host: smtp.163.com
+    port: 465
+    username: ${MAIL_USERNAME:lrx563647@yeah.net}
+    password: ${MAIL_PASSWORD:YEUdHnDgEtJNBLQd}
+    protocol: smtps
+    default-encoding: UTF-8
+    send:
+      retry:
+        max: 3
+        delay: 1000
+    properties:
+      mail:
+        smtp:
+          ssl:
+            enable: true
+          auth: true
+          starttls:
+            enable: true
+            required: true
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USER:admin}
     password: ${RABBITMQ_PASSWORD:rabbitmq123456}
     virtual-host: /
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_HOST:localhost}:${NACOS_PORT:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+        enabled: ${NACOS_ENABLED:true}
+      config:
+        enabled: false
+    sentinel:
+      enabled: true
+      transport:
+        dashboard: ${SENTINEL_DASHBOARD:localhost:8080}
+      http-method-specify: true
+      web-context-unify: false
+      flow:
+        cold-factor: 3
+      datasource:
+        flow:
+          nacos:
+            server-addr: ${NACOS_HOST:localhost}:${NACOS_PORT:8848}
+            dataId: ${spring.application.name}-sentinel-flow
+            groupId: DEFAULT_GROUP
+            rule-type: flow
+            username: ${NACOS_USERNAME:nacos}
+            password: ${NACOS_PASSWORD:nacos}
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
@@ -68,3 +105,26 @@ knife4j:
 logging:
   level:
     com.fnusale: debug
+
+# Aliyun OSS 配置
+aliyun:
+  oss:
+    endpoint: oss-cn-beijing.aliyuncs.com
+    access-key-id: ${ALIYUN_ACCESS_KEY_ID:}
+    access-key-secret: ${ALIYUN_ACCESS_KEY_SECRET:}
+    bucket-name: rongxpicture
+    domain: ${OSS_DOMAIN:}
+
+# 校园围栏配置（示例：福州大学旗山校区）
+campus:
+  fence:
+    enabled: true
+    # 多边形围栏顶点（按顺时针排列）- 福州大学旗山校区示例
+    polygon:
+      - "119.2056,26.0689"  # 东北角
+      - "119.2089,26.0689"  # 东南角
+      - "119.2089,26.0633"  # 西南角
+      - "119.2056,26.0633"  # 西北角
+    # 备用圆形围栏
+    center: "119.2072,26.0661"  # 校园中心点
+    radius: 1000  # 半径 1000 米
