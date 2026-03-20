@@ -21,6 +21,7 @@
         <module>fnusale-marketing</module>
         <module>fnusale-trade</module>
         <module>fnusale-admin</module>
+        <module>fnusale-agent</module>
     </modules>
 
     <properties>
@@ -56,6 +57,10 @@
         <easyexcel.version>3.3.4</easyexcel.version>
         <jwt.version>0.12.5</jwt.version>
         <fastjson2.version>2.0.47</fastjson2.version>
+        <logstash-logback-encoder.version>7.4</logstash-logback-encoder.version>
+
+        <!-- RocketMQ -->
+        <rocketmq.version>2.2.3</rocketmq.version>
 
         <!-- Plugin versions -->
         <maven-compiler-plugin.version>3.12.1</maven-compiler-plugin.version>
@@ -118,6 +123,13 @@
                 <groupId>org.redisson</groupId>
                 <artifactId>redisson-spring-boot-starter</artifactId>
                 <version>${redisson.version}</version>
+            </dependency>
+
+            <!-- RocketMQ -->
+            <dependency>
+                <groupId>org.apache.rocketmq</groupId>
+                <artifactId>rocketmq-spring-boot-starter</artifactId>
+                <version>${rocketmq.version}</version>
             </dependency>
 
             <!-- Tools -->
@@ -190,6 +202,13 @@
                 <groupId>com.alibaba.fastjson2</groupId>
                 <artifactId>fastjson2</artifactId>
                 <version>${fastjson2.version}</version>
+            </dependency>
+
+            <!-- Logstash Logback Encoder -->
+            <dependency>
+                <groupId>net.logstash.logback</groupId>
+                <artifactId>logstash-logback-encoder</artifactId>
+                <version>${logstash-logback-encoder.version}</version>
             </dependency>
 
             <!-- Micrometer -->

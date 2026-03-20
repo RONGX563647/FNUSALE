@@ -254,11 +254,10 @@ services:
       NAMESRV_ADDR: "rocketmq-nameserver:9876"
       JAVA_OPT_EXT: "-Duser.home=/home/rocketmq -server -Xms256m -Xmx512m"
       JAVA_OPT: "-Duser.home=/home/rocketmq"
-    command: ["sh", "mqbroker", "-c", "/home/rocketmq/rocketmq-5.1.0/conf/broker.conf"]
+    command: ["sh", "mqbroker", "-n", "rocketmq-nameserver:9876"]
     volumes:
       - rocketmq_broker_logs:/home/rocketmq/logs
       - rocketmq_broker_store:/home/rocketmq/store
-      - ./rocketmq/broker.conf:/home/rocketmq/rocketmq-5.1.0/conf/broker.conf:ro
     depends_on:
       - rocketmq-nameserver
     deploy:
@@ -298,6 +297,70 @@ services:
 
   # ==================== 监控层 ====================
 
+  # Logstash 8.0.0 - 日志收集与处理
+  # 用途：收集微服务日志，处理后写入 Elasticsearch
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.0.0
+    container_name: fnusale-logstash
+    restart: unless-stopped
+    ports:
+      - "${LOGSTASH_PORT:-4560}:4560"
+      - "5044:5044"
+    environment:
+      LS_JAVA_OPTS: "-Xms256m -Xmx512m"
+    volumes:
+      - ./logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+      - logstash_data:/usr/share/logstash/data
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9600/_node/stats || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 768M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - fnusale-network
+
+  # Kibana 8.0.0 - 日志可视化
+  # 用途：可视化展示日志数据，日志搜索与分析
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.0.0
+    container_name: fnusale-kibana
+    restart: unless-stopped
+    ports:
+      - "${KIBANA_PORT:-5601}:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: '["http://elasticsearch:9200"]'
+      I18N_LOCALE: "zh-CN"
+      SERVER_NAME: "fnusale-kibana"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - fnusale-network
+
   # Prometheus - 监控数据采集
   # 用途：采集微服务指标数据，监控服务健康状态、秒杀QPS、缓存命中率等
   prometheus:
@@ -308,6 +371,7 @@ services:
       - "${PROMETHEUS_PORT:-9090}:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -316,6 +380,8 @@ services:
       - '--storage.tsdb.retention.time=15d'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
+    depends_on:
+      - alertmanager
     deploy:
       resources:
         limits:
@@ -324,6 +390,32 @@ services:
         reservations:
           cpus: '0.25'
           memory: 256M
+    networks:
+      - fnusale-network
+
+  # Alertmanager - 告警通知
+  # 用途：接收 Prometheus 告警，发送通知（邮件、Webhook等）
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: fnusale-alertmanager
+    restart: unless-stopped
+    ports:
+      - "${ALERTMANAGER_PORT:-9093}:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
     networks:
       - fnusale-network
 
@@ -343,6 +435,7 @@ services:
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
       - prometheus
     deploy:
@@ -353,6 +446,102 @@ services:
         reservations:
           cpus: '0.1'
           memory: 128M
+    networks:
+      - fnusale-network
+
+  # ==================== 监控 Exporters ====================
+
+  # Redis Exporter - Redis 指标采集
+  # 用途：采集 Redis 性能指标、内存使用、连接数等
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: fnusale-redis-exporter
+    restart: unless-stopped
+    ports:
+      - "9121:9121"
+    environment:
+      REDIS_ADDR: "redis://redis:6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis123456}
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 64M
+        reservations:
+          cpus: '0.05'
+          memory: 32M
+    networks:
+      - fnusale-network
+
+  # MySQL Exporter - MySQL 指标采集
+  # 用途：采集 MySQL 性能指标、连接数、慢查询等
+  mysql-exporter:
+    image: prom/mysqld-exporter:latest
+    container_name: fnusale-mysql-exporter
+    restart: unless-stopped
+    ports:
+      - "9104:9104"
+    environment:
+      DATA_SOURCE_NAME: "${MYSQL_USER:-fnusale}:${MYSQL_PASSWORD:-fnusale123456}@(mysql:3306)/"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 64M
+        reservations:
+          cpus: '0.05'
+          memory: 32M
+    networks:
+      - fnusale-network
+
+  # RocketMQ Exporter - RocketMQ 指标采集
+  # 用途：采集 RocketMQ 消息堆积、TPS、Broker 状态等
+  rocketmq-exporter:
+    image: styletang/rocketmq-exporter:latest
+    container_name: fnusale-rocketmq-exporter
+    restart: unless-stopped
+    ports:
+      - "5557:5557"
+    environment:
+      rocketmq.config.namesrvAddr: "rocketmq-nameserver:9876"
+    depends_on:
+      - rocketmq-nameserver
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 64M
+    networks:
+      - fnusale-network
+
+  # Elasticsearch Exporter - ES 指标采集
+  # 用途：采集 Elasticsearch 集群状态、索引、搜索性能等
+  elasticsearch-exporter:
+    image: quay.io/prometheuscommunity/elasticsearch-exporter:latest
+    container_name: fnusale-elasticsearch-exporter
+    restart: unless-stopped
+    ports:
+      - "9114:9114"
+    command:
+      - '--es.uri=http://elasticsearch:9200'
+    depends_on:
+      - elasticsearch
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 64M
+        reservations:
+          cpus: '0.05'
+          memory: 32M
     networks:
       - fnusale-network
 
@@ -395,3 +584,9 @@ volumes:
   # Grafana仪表板配置
   grafana_data:
     name: fnusale-grafana-data
+  # Logstash数据卷
+  logstash_data:
+    name: fnusale-logstash-data
+  # Alertmanager数据卷
+  alertmanager_data:
+    name: fnusale-alertmanager-data

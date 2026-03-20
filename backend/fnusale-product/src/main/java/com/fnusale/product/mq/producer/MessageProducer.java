@@ -1,25 +1,26 @@
 package com.fnusale.product.mq.producer;
 
-import com.fnusale.product.mq.config.RabbitMQConfig;
+import com.fnusale.product.mq.config.RocketMQConfig;
 import com.fnusale.product.mq.message.AITaskMessage;
 import com.fnusale.product.mq.message.ProductEventMessage;
 import com.fnusale.product.mq.message.UserBehaviorMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.apache.rocketmq.spring.core.RocketMQTemplate;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
 /**
- * 消息发送工具类
+ * 消息发送工具类 - RocketMQ 实现
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class MessageProducer {
 
-    private final RabbitTemplate rabbitTemplate;
+    private final RocketMQTemplate rocketMQTemplate;
 
     /**
      * 发送商品事件消息
@@ -34,10 +35,11 @@ public class MessageProducer {
                 message.setTimestamp(System.currentTimeMillis());
             }
 
-            rabbitTemplate.convertAndSend(
-                    RabbitMQConfig.PRODUCT_EVENT_EXCHANGE,
-                    "product.event." + message.getEventType().toLowerCase(),
-                    message
+            String destination = RocketMQConfig.PRODUCT_EVENT_TOPIC + ":" + message.getEventType();
+
+            rocketMQTemplate.syncSend(
+                    destination,
+                    MessageBuilder.withPayload(message).build()
             );
 
             log.info("发送商品事件消息成功: messageId={}, productId={}, eventType={}",
@@ -61,10 +63,22 @@ public class MessageProducer {
                 message.setTimestamp(System.currentTimeMillis());
             }
 
-            rabbitTemplate.convertAndSend(
-                    RabbitMQConfig.USER_BEHAVIOR_EXCHANGE,
-                    "user.behavior." + message.getBehaviorType().toLowerCase(),
-                    message
+            String destination = RocketMQConfig.USER_BEHAVIOR_TOPIC + ":" + message.getBehaviorType();
+
+            rocketMQTemplate.asyncSend(
+                    destination,
+                    MessageBuilder.withPayload(message).build(),
+                    new org.apache.rocketmq.spring.core.RocketMQLocalTransactionCallback() {
+                        @Override
+                        public void executeLocalTransaction(org.springframework.messaging.Message msg, Object arg) {
+                            // 异步发送，无需本地事务
+                        }
+
+                        @Override
+                        public org.apache.rocketmq.spring.core.RocketMQLocalTransactionState checkLocalTransaction(org.springframework.messaging.Message msg) {
+                            return org.apache.rocketmq.spring.core.RocketMQLocalTransactionState.COMMIT;
+                        }
+                    }
             );
 
             log.debug("发送用户行为消息成功: messageId={}, userId={}, productId={}, behaviorType={}",
@@ -88,10 +102,11 @@ public class MessageProducer {
                 message.setTimestamp(System.currentTimeMillis());
             }
 
-            rabbitTemplate.convertAndSend(
-                    RabbitMQConfig.AI_TASK_EXCHANGE,
-                    "ai.task." + message.getTaskType().toLowerCase(),
-                    message
+            String destination = RocketMQConfig.AI_TASK_TOPIC + ":" + message.getTaskType();
+
+            rocketMQTemplate.syncSend(
+                    destination,
+                    MessageBuilder.withPayload(message).build()
             );
 
             log.info("发送AI任务消息成功: taskId={}, taskType={}",

@@ -89,10 +89,10 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- RabbitMQ -->
+        <!-- RocketMQ -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-amqp</artifactId>
+            <groupId>org.apache.rocketmq</groupId>
+            <artifactId>rocketmq-spring-boot-starter</artifactId>
             <scope>provided</scope>
         </dependency>
 
@@ -114,6 +114,13 @@
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-mysql</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Logstash Logback Encoder -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
             <scope>provided</scope>
         </dependency>
     </dependencies>

@@ -81,6 +81,14 @@ spring:
           filters:
             - StripPrefix=1
 
+        # 智能购物助手服务
+        - id: fnusale-agent
+          uri: lb://fnusale-agent
+          predicates:
+            - Path=/api/agent/**
+          filters:
+            - StripPrefix=1
+
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -101,3 +109,22 @@ logging:
   level:
     com.fnusale: debug
     org.springframework.cloud.gateway: debug
+
+# Actuator 监控配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  prometheus:
+    metrics:
+      export:
+        enabled: true

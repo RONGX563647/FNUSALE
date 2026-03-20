@@ -1,17 +1,15 @@
 package com.fnusale.product.mq.consumer;
 
-import com.fnusale.product.mq.config.RabbitMQConfig;
+import com.fnusale.product.mq.config.RocketMQConfig;
 import com.fnusale.product.mq.message.AITaskMessage;
-import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.amqp.support.AmqpHeaders;
+import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
+import org.apache.rocketmq.spring.core.RocketMQListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 /**
  * AI任务消费者
@@ -20,7 +18,12 @@ import java.io.IOException;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class AITaskConsumer {
+@RocketMQMessageListener(
+        topic = RocketMQConfig.AI_TASK_TOPIC,
+        consumerGroup = RocketMQConfig.AI_TASK_CONSUMER_GROUP,
+        selectorExpression = "*"
+)
+public class AITaskConsumer implements RocketMQListener<AITaskMessage> {
 
     private final StringRedisTemplate redisTemplate;
 
@@ -29,10 +32,8 @@ public class AITaskConsumer {
     /**
      * 消费AI任务消息
      */
-    @RabbitListener(queues = RabbitMQConfig.AI_TASK_QUEUE)
-    public void handleAITask(AITaskMessage message,
-                             Channel channel,
-                             @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) throws IOException {
+    @Override
+    public void onMessage(AITaskMessage message) {
         log.info("AI任务消费者收到消息: taskId={}, taskType={}",
                 message.getTaskId(), message.getTaskType());
 
@@ -48,11 +49,9 @@ public class AITaskConsumer {
                     log.warn("未知AI任务类型: {}", message.getTaskType());
             }
 
-            channel.basicAck(deliveryTag, false);
-
         } catch (Exception e) {
             log.error("AI任务处理失败: taskId={}", message.getTaskId(), e);
-            channel.basicNack(deliveryTag, false, true);
+            throw new RuntimeException("AI任务处理失败", e);
         }
     }
 
@@ -110,6 +109,6 @@ public class AITaskConsumer {
         String key = AI_RESULT_KEY + taskId;
         redisTemplate.opsForValue().set(key, result);
         // 结果保存1小时
-        redisTemplate.expire(key, 1, java.util.concurrent.TimeUnit.HOURS);
+        redisTemplate.expire(key, 1, TimeUnit.HOURS);
     }
 }

@@ -1,18 +1,14 @@
 package com.fnusale.product.mq.consumer;
 
-import com.fnusale.product.mq.config.RabbitMQConfig;
+import com.fnusale.product.mq.config.RocketMQConfig;
 import com.fnusale.product.mq.message.ProductEventMessage;
 import com.fnusale.product.mq.message.UserBehaviorMessage;
-import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.amqp.support.AmqpHeaders;
+import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
+import org.apache.rocketmq.spring.core.RocketMQListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
-
-import java.io.IOException;
 
 /**
  * 统计服务消费者
@@ -21,21 +17,23 @@ import java.io.IOException;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class StatsConsumer {
+@RocketMQMessageListener(
+        topic = RocketMQConfig.PRODUCT_EVENT_TOPIC,
+        consumerGroup = RocketMQConfig.STATS_CONSUMER_GROUP,
+        selectorExpression = "*"
+)
+public class StatsConsumer implements RocketMQListener<ProductEventMessage> {
 
     private final StringRedisTemplate redisTemplate;
 
-    private static final String PROCESSED_MSG_KEY = "mq:processed:stats:";
     private static final String PRODUCT_STATS_KEY = "product:stats:";
     private static final String USER_STATS_KEY = "user:stats:";
 
     /**
      * 消费商品事件消息 - 统计更新
      */
-    @RabbitListener(queues = RabbitMQConfig.PRODUCT_STATS_QUEUE)
-    public void handleProductEvent(ProductEventMessage message,
-                                   Channel channel,
-                                   @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) throws IOException {
+    @Override
+    public void onMessage(ProductEventMessage message) {
         log.debug("统计消费者收到商品事件: messageId={}, productId={}, eventType={}",
                 message.getMessageId(), message.getProductId(), message.getEventType());
 
@@ -48,33 +46,9 @@ public class StatsConsumer {
                 updateCategoryProductCount(message.getCategoryId(), message.getEventType());
             }
 
-            channel.basicAck(deliveryTag, false);
-
         } catch (Exception e) {
             log.error("商品统计处理失败: messageId={}", message.getMessageId(), e);
-            channel.basicNack(deliveryTag, false, true);
-        }
-    }
-
-    /**
-     * 消费用户行为消息 - 统计更新
-     */
-    @RabbitListener(queues = RabbitMQConfig.BEHAVIOR_STATS_QUEUE)
-    public void handleUserBehavior(UserBehaviorMessage message,
-                                   Channel channel,
-                                   @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) throws IOException {
-        log.debug("统计消费者收到用户行为: messageId={}, productId={}, behaviorType={}",
-                message.getMessageId(), message.getProductId(), message.getBehaviorType());
-
-        try {
-            // 更新商品统计
-            updateProductBehaviorStats(message.getProductId(), message.getBehaviorType());
-
-            channel.basicAck(deliveryTag, false);
-
-        } catch (Exception e) {
-            log.error("行为统计处理失败: messageId={}", message.getMessageId(), e);
-            channel.basicNack(deliveryTag, false, true);
+            throw new RuntimeException("商品统计处理失败", e);
         }
     }
 
@@ -112,32 +86,5 @@ public class StatsConsumer {
                 break;
         }
         log.debug("更新品类商品数: categoryId={}, eventType={}", categoryId, eventType);
-    }
-
-    /**
-     * 更新商品行为统计
-     */
-    private void updateProductBehaviorStats(Long productId, String behaviorType) {
-        if (productId == null) return;
-
-        String key = PRODUCT_STATS_KEY + productId;
-        switch (behaviorType) {
-            case UserBehaviorMessage.BEHAVIOR_COLLECT:
-                redisTemplate.opsForHash().increment(key, "collectCount", 1);
-                break;
-            case UserBehaviorMessage.BEHAVIOR_UNCOLLECT:
-                redisTemplate.opsForHash().increment(key, "collectCount", -1);
-                break;
-            case UserBehaviorMessage.BEHAVIOR_LIKE:
-                redisTemplate.opsForHash().increment(key, "likeCount", 1);
-                break;
-            case UserBehaviorMessage.BEHAVIOR_UNLIKE:
-                redisTemplate.opsForHash().increment(key, "likeCount", -1);
-                break;
-            case UserBehaviorMessage.BEHAVIOR_BROWSE:
-                redisTemplate.opsForHash().increment(key, "browseCount", 1);
-                break;
-        }
-        log.debug("更新商品行为统计: productId={}, behaviorType={}", productId, behaviorType);
     }
 }

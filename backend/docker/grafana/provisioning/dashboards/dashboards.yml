@@ -1,0 +1,16 @@
+# Grafana Dashboard Provider 配置
+# 自动加载预配置的 Dashboard
+
+apiVersion: 1
+
+providers:
+  - name: 'FNUSALE Dashboards'
+    orgId: 1
+    folder: 'FNUSALE'
+    folderUid: 'fnusale'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/json

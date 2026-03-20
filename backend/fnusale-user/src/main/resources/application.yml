@@ -20,31 +20,25 @@ spring:
       password: ${REDIS_PASSWORD:redis123456}
       database: 0
     mail:
-    host: smtp.163.com
-    port: 465
-    username: ${MAIL_USERNAME:lrx563647@yeah.net}
-    password: ${MAIL_PASSWORD:YEUdHnDgEtJNBLQd}
-    protocol: smtps
-    default-encoding: UTF-8
-    send:
-      retry:
-        max: 3
-        delay: 1000
-    properties:
-      mail:
-        smtp:
-          ssl:
-            enable: true
-          auth: true
-          starttls:
-            enable: true
-            required: true
-  rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USER:admin}
-    password: ${RABBITMQ_PASSWORD:rabbitmq123456}
-    virtual-host: /
+      host: smtp.163.com
+      port: 465
+      username: ${MAIL_USERNAME:lrx563647@yeah.net}
+      password: ${MAIL_PASSWORD:YEUdHnDgEtJNBLQd}
+      protocol: smtps
+      default-encoding: UTF-8
+      send:
+        retry:
+          max: 3
+          delay: 1000
+      properties:
+        mail:
+          smtp:
+            ssl:
+              enable: true
+            auth: true
+            starttls:
+              enable: true
+              required: true
   cloud:
     nacos:
       discovery:
@@ -106,6 +100,14 @@ logging:
   level:
     com.fnusale: debug
 
+# RocketMQ 配置
+rocketmq:
+  name-server: ${ROCKETMQ_NAME_SERVER:localhost:9876}
+  producer:
+    group: user-producer-group
+    send-message-timeout: 3000
+    retry-times-when-send-failed: 2
+
 # Aliyun OSS 配置
 aliyun:
   oss:
@@ -136,3 +138,22 @@ campus:
     # 备用圆形围栏
     center: "119.2072,26.0661"  # 校园中心点
     radius: 1000  # 半径 1000 米
+
+# Actuator 监控配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  prometheus:
+    metrics:
+      export:
+        enabled: true

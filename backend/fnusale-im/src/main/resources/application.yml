@@ -41,12 +41,13 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:redis123456}
       database: 0
-  rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USER:admin}
-    password: ${RABBITMQ_PASSWORD:rabbitmq123456}
-    virtual-host: /
+  # RocketMQ 配置
+rocketmq:
+  name-server: ${ROCKETMQ_NAME_SERVER:localhost:9876}
+  producer:
+    group: im-producer-group
+    send-message-timeout: 3000
+    retry-times-when-send-failed: 2
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
@@ -79,3 +80,22 @@ knife4j:
 logging:
   level:
     com.fnusale: debug
+
+# Actuator 监控配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  prometheus:
+    metrics:
+      export:
+        enabled: true

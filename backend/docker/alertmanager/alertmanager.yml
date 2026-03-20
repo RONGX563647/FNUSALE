@@ -1,0 +1,109 @@
+# Alertmanager 配置文件
+# 校园二手交易平台 - 告警通知配置
+
+global:
+  # SMTP 配置（邮件通知）
+  smtp_smarthost: '${SMTP_HOST:-smtp.163.com:465}'
+  smtp_from: '${SMTP_FROM:-alertmanager@example.com}'
+  smtp_auth_username: '${SMTP_USER:-}'
+  smtp_auth_password: '${SMTP_PASSWORD:-}'
+  smtp_require_tls: true
+
+  # 全局告警标签
+  resolve_timeout: 5m
+
+# 告警路由配置
+route:
+  # 默认接收器
+  receiver: 'default-receiver'
+
+  # 告警分组（按服务名分组）
+  group_by: ['alertname', 'service', 'severity']
+
+  # 首次告警等待时间（避免短时间内大量告警）
+  group_wait: 30s
+
+  # 同组告警间隔时间
+  group_interval: 5m
+
+  # 重复告警间隔时间
+  repeat_interval: 4h
+
+  # 子路由配置
+  routes:
+    # 严重告警 - 立即通知
+    - match:
+        severity: critical
+      receiver: 'critical-receiver'
+      group_wait: 10s
+      repeat_interval: 1h
+
+    # 警告告警 - 正常通知
+    - match:
+        severity: warning
+      receiver: 'warning-receiver'
+      group_wait: 30s
+      repeat_interval: 4h
+
+# 接收器配置
+receivers:
+  # 默认接收器
+  - name: 'default-receiver'
+    webhook_configs:
+      - url: '${WEBHOOK_URL:-http://localhost:5001/alert}'
+        send_resolved: true
+
+  # 严重告警接收器
+  - name: 'critical-receiver'
+    email_configs:
+      - to: '${ALERT_EMAIL:-admin@example.com}'
+        headers:
+          Subject: '[严重] FNUSALE 告警 - {{ .GroupLabels.alertname }}'
+        html: |
+          <h2>🚨 严重告警通知</h2>
+          <p><strong>告警名称：</strong>{{ .GroupLabels.alertname }}</p>
+          <p><strong>告警级别：</strong>{{ .GroupLabels.severity }}</p>
+          <p><strong>告警时间：</strong>{{ .StartsAt.Format "2006-01-02 15:04:05" }}</p>
+          <hr>
+          {{ range .Alerts }}
+          <h3>告警详情</h3>
+          <p><strong>摘要：</strong>{{ .Annotations.summary }}</p>
+          <p><strong>描述：</strong>{{ .Annotations.description }}</p>
+          {{ end }}
+    webhook_configs:
+      - url: '${WEBHOOK_URL:-http://localhost:5001/alert}'
+        send_resolved: true
+
+  # 警告告警接收器
+  - name: 'warning-receiver'
+    email_configs:
+      - to: '${ALERT_EMAIL:-admin@example.com}'
+        headers:
+          Subject: '[警告] FNUSALE 告警 - {{ .GroupLabels.alertname }}'
+        html: |
+          <h2>⚠️ 警告告警通知</h2>
+          <p><strong>告警名称：</strong>{{ .GroupLabels.alertname }}</p>
+          <p><strong>告警级别：</strong>{{ .GroupLabels.severity }}</p>
+          <p><strong>告警时间：</strong>{{ .StartsAt.Format "2006-01-02 15:04:05" }}</p>
+          <hr>
+          {{ range .Alerts }}
+          <h3>告警详情</h3>
+          <p><strong>摘要：</strong>{{ .Annotations.summary }}</p>
+          <p><strong>描述：</strong>{{ .Annotations.description }}</p>
+          {{ end }}
+
+# 告警抑制规则
+inhibit_rules:
+  # 服务宕机时，抑制该服务的其他告警
+  - source_match:
+      alertname: 'ServiceInstanceDown'
+    target_match_re:
+      alertname: '.*'
+    equal: ['instance']
+
+  # 集群状态 RED 时，抑制 YELLOW 警告
+  - source_match:
+      alertname: 'ElasticsearchClusterHealthRed'
+    target_match:
+      alertname: 'ElasticsearchClusterHealthYellow'
+    equal: ['instance']

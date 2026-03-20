@@ -1,17 +1,14 @@
 package com.fnusale.product.mq.consumer;
 
-import com.fnusale.product.mq.config.RabbitMQConfig;
+import com.fnusale.product.mq.config.RocketMQConfig;
 import com.fnusale.product.mq.message.UserBehaviorMessage;
-import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.amqp.support.AmqpHeaders;
-import org.springframework.messaging.handler.annotation.Header;
+import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
+import org.apache.rocketmq.spring.core.RocketMQListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -25,7 +22,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class BehaviorRecordConsumer {
+@RocketMQMessageListener(
+        topic = RocketMQConfig.USER_BEHAVIOR_TOPIC,
+        consumerGroup = RocketMQConfig.BEHAVIOR_RECORD_CONSUMER_GROUP,
+        selectorExpression = "*"
+)
+public class BehaviorRecordConsumer implements RocketMQListener<UserBehaviorMessage> {
 
     // 内存批量队列
     private final Map<String, UserBehaviorMessage> browseQueue = new ConcurrentHashMap<>();
@@ -33,15 +35,12 @@ public class BehaviorRecordConsumer {
 
     // 批量处理阈值
     private static final int BATCH_SIZE = 100;
-    private static final String BROWSE_KEY_PREFIX = "behavior:browse:";
 
     /**
      * 消费用户行为消息 - 行为记录
      */
-    @RabbitListener(queues = RabbitMQConfig.BEHAVIOR_RECORD_QUEUE)
-    public void handleUserBehavior(UserBehaviorMessage message,
-                                   Channel channel,
-                                   @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) throws IOException {
+    @Override
+    public void onMessage(UserBehaviorMessage message) {
         try {
             // 浏览行为使用批量处理
             if (UserBehaviorMessage.BEHAVIOR_BROWSE.equals(message.getBehaviorType())) {
@@ -51,11 +50,9 @@ public class BehaviorRecordConsumer {
                 processBehaviorDirectly(message);
             }
 
-            channel.basicAck(deliveryTag, false);
-
         } catch (Exception e) {
             log.error("行为记录处理失败: messageId={}", message.getMessageId(), e);
-            channel.basicNack(deliveryTag, false, true);
+            throw new RuntimeException("行为记录处理失败", e);
         }
     }
 

@@ -1,17 +1,13 @@
 package com.fnusale.product.mq.consumer;
 
-import com.fnusale.product.mq.config.RabbitMQConfig;
+import com.fnusale.product.mq.config.RocketMQConfig;
 import com.fnusale.product.mq.message.ProductEventMessage;
-import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.amqp.support.AmqpHeaders;
+import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
+import org.apache.rocketmq.spring.core.RocketMQListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
-
-import java.io.IOException;
 
 /**
  * ES同步消费者
@@ -20,7 +16,12 @@ import java.io.IOException;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class ESSyncConsumer {
+@RocketMQMessageListener(
+        topic = RocketMQConfig.PRODUCT_EVENT_TOPIC,
+        consumerGroup = RocketMQConfig.ES_SYNC_CONSUMER_GROUP,
+        selectorExpression = "*"
+)
+public class ESSyncConsumer implements RocketMQListener<ProductEventMessage> {
 
     private final StringRedisTemplate redisTemplate;
 
@@ -29,10 +30,8 @@ public class ESSyncConsumer {
     /**
      * 消费商品事件消息 - ES同步
      */
-    @RabbitListener(queues = RabbitMQConfig.PRODUCT_ES_QUEUE)
-    public void handleProductEvent(ProductEventMessage message,
-                                   Channel channel,
-                                   @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) throws IOException {
+    @Override
+    public void onMessage(ProductEventMessage message) {
         log.info("ES同步消费者收到消息: messageId={}, productId={}, eventType={}",
                 message.getMessageId(), message.getProductId(), message.getEventType());
 
@@ -40,7 +39,6 @@ public class ESSyncConsumer {
             // 幂等性检查
             if (isProcessed(message.getMessageId())) {
                 log.info("消息已处理，跳过: messageId={}", message.getMessageId());
-                channel.basicAck(deliveryTag, false);
                 return;
             }
 
@@ -62,15 +60,12 @@ public class ESSyncConsumer {
             // 标记消息已处理
             markProcessed(message.getMessageId());
 
-            // 手动ACK
-            channel.basicAck(deliveryTag, false);
             log.info("ES同步处理完成: productId={}", message.getProductId());
 
         } catch (Exception e) {
             log.error("ES同步处理失败: messageId={}, productId={}",
                     message.getMessageId(), message.getProductId(), e);
-            // 消息处理失败，拒绝并重新入队
-            channel.basicNack(deliveryTag, false, true);
+            throw new RuntimeException("ES同步处理失败", e);
         }
     }
 
@@ -105,6 +100,7 @@ public class ESSyncConsumer {
      * 检查消息是否已处理
      */
     private boolean isProcessed(String messageId) {
+        if (messageId == null) return false;
         return Boolean.TRUE.equals(redisTemplate.hasKey(PROCESSED_MSG_KEY + messageId));
     }
 
@@ -112,6 +108,7 @@ public class ESSyncConsumer {
      * 标记消息已处理
      */
     private void markProcessed(String messageId) {
+        if (messageId == null) return;
         redisTemplate.opsForValue().set(PROCESSED_MSG_KEY + messageId, "1");
     }
 }
