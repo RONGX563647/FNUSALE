@@ -90,7 +90,7 @@ public class JwtUtil {
                     .parseSignedClaims(token)
                     .getPayload();
         } catch (Exception e) {
-            log.error("解析JWT令牌失败: {}", e.getMessage());
+            log.error("解析JWT令牌失败", e);
             return null;
         }
     }
@@ -106,7 +106,7 @@ public class JwtUtil {
             }
             return !isTokenExpired(claims);
         } catch (Exception e) {
-            log.error("验证JWT令牌失败: {}", e.getMessage());
+            log.error("验证JWT令牌失败", e);
             return false;
         }
     }

@@ -24,24 +24,31 @@ import com.fnusale.marketing.client.ProductClient;
 import com.fnusale.marketing.mapper.LocalMessageMapper;
 import com.fnusale.marketing.mapper.SeckillActivityMapper;
 import com.fnusale.marketing.mapper.SeckillReminderMapper;
+import com.fnusale.marketing.script.SeckillLuaScript;
 import com.fnusale.marketing.service.MarketingEventPublisher;
 import com.fnusale.marketing.service.SeckillService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.annotation.PostConstruct;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 
 /**
  * 秒杀服务实现
@@ -60,21 +67,93 @@ public class SeckillServiceImpl implements SeckillService {
     private final ProductClient productClient;
     private final OrderClient orderClient;
 
+    /**
+     * 库存扣减 Redis 脚本
+     */
+    private DefaultRedisScript<Long> decrementStockScript;
+
+    /**
+     * 库存预热 Redis 脚本
+     */
+    private DefaultRedisScript<Long> warmUpStockScript;
+
+    /**
+     * 预热并扣减库存脚本（原子操作）
+     */
+    private DefaultRedisScript<Long> warmUpAndDecrementScript;
+
+    /**
+     * 商品信息本地缓存
+     * 缓存秒杀商品信息，减少远程调用
+     */
+    private Cache<Long, ProductVO> productCache;
+
+    @PostConstruct
+    public void init() {
+        decrementStockScript = new DefaultRedisScript<>();
+        decrementStockScript.setScriptText(SeckillLuaScript.DECREMENT_STOCK_SCRIPT);
+        decrementStockScript.setResultType(Long.class);
+
+        warmUpStockScript = new DefaultRedisScript<>();
+        warmUpStockScript.setScriptText(SeckillLuaScript.WARM_UP_STOCK_SCRIPT);
+        warmUpStockScript.setResultType(Long.class);
+
+        warmUpAndDecrementScript = new DefaultRedisScript<>();
+        warmUpAndDecrementScript.setScriptText(SeckillLuaScript.WARM_UP_AND_DECREMENT_SCRIPT);
+        warmUpAndDecrementScript.setResultType(Long.class);
+
+        // 初始化商品信息缓存
+        productCache = Caffeine.newBuilder()
+                .maximumSize(1000)
+                .expireAfterWrite(Duration.ofMinutes(10))
+                .recordStats()
+                .build();
+    }
+
     @Override
     public List<SeckillActivityVO> getSeckillList(Long userId) {
-        List<SeckillActivity> activities = activityMapper.selectActiveActivities();
-        List<SeckillActivityVO> voList = new ArrayList<>();
-        for (SeckillActivity activity : activities) {
-            SeckillActivityVO vo = convertToVO(activity);
-            // 检查是否已设置提醒
-            if (userId != null) {
-                int count = reminderMapper.countByUserAndActivity(userId, activity.getId());
-                vo.setReminded(count > 0);
+        String cacheKey = MarketingConstants.SECKILL_TODAY_KEY;
+        List<SeckillActivityVO> voList;
+
+        // 尝试从缓存获取
+        try {
+            String cachedList = redisTemplate.opsForValue().get(cacheKey);
+            if (cachedList != null) {
+                voList = objectMapper.readValue(cachedList,
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, SeckillActivityVO.class));
             } else {
-                vo.setReminded(false);
+                // 查询数据库
+                List<SeckillActivity> activities = activityMapper.selectActiveActivities();
+                voList = activities.stream()
+                        .map(this::convertToVO)
+                        .collect(java.util.stream.Collectors.toList());
+
+                // 缓存5分钟
+                if (!voList.isEmpty()) {
+                    redisTemplate.opsForValue().set(cacheKey,
+                            objectMapper.writeValueAsString(voList),
+                            Duration.ofMinutes(5));
+                }
             }
-            voList.add(vo);
+        } catch (Exception e) {
+            log.warn("读取活动列表缓存失败，从数据库查询", e);
+            List<SeckillActivity> activities = activityMapper.selectActiveActivities();
+            voList = activities.stream()
+                    .map(this::convertToVO)
+                    .collect(java.util.stream.Collectors.toList());
         }
+
+        // 批量查询提醒状态（解决 N+1 问题）
+        if (userId != null && !voList.isEmpty()) {
+            List<Long> activityIds = voList.stream()
+                    .map(SeckillActivityVO::getId)
+                    .collect(java.util.stream.Collectors.toList());
+            java.util.Set<Long> remindedActivityIds = reminderMapper.selectRemindedActivityIds(userId, activityIds);
+            voList.forEach(vo -> vo.setReminded(remindedActivityIds.contains(vo.getId())));
+        } else {
+            voList.forEach(vo -> vo.setReminded(false));
+        }
+
         return voList;
     }
 
@@ -124,33 +203,36 @@ public class SeckillServiceImpl implements SeckillService {
             throw new BusinessException(5005, "您已参与过该秒杀");
         }
 
-        // Redis预扣库存
+        // Redis预扣库存 - 使用预热+扣减原子脚本
         String stockKey = MarketingConstants.SECKILL_STOCK_KEY_PREFIX + activityId;
-        String stockStr = redisTemplate.opsForValue().get(stockKey);
 
-        // 如果Redis中没有库存，从DB加载
-        if (stockStr == null) {
-            redisTemplate.opsForValue().set(stockKey, activity.getRemainStock().toString());
-            stockStr = activity.getRemainStock().toString();
+        // 计算过期时间
+        long expireSeconds = Duration.between(LocalDateTime.now(), activity.getEndTime()).getSeconds();
+        if (expireSeconds <= 0) {
+            expireSeconds = MarketingConstants.SECKILL_STOCK_PRELOAD_MINUTES * 60L;
         }
 
-        long remainStock = Long.parseLong(stockStr);
-        if (remainStock <= 0) {
-            throw new BusinessException(5004, "秒杀库存不足");
+        // 使用 Lua 脚本原子预热并扣减库存
+        Long result = redisTemplate.execute(
+                warmUpAndDecrementScript,
+                Collections.singletonList(stockKey),
+                activity.getRemainStock().toString(),
+                String.valueOf(expireSeconds)
+        );
+
+        // result: -1=参数错误, 0=库存不足, 正数=扣减成功返回剩余库存
+        if (result == null || result == -1) {
+            log.error("秒杀库存扣减参数错误: activityId={}", activityId);
+            throw new BusinessException(500, "系统繁忙，请稍后重试");
         }
 
-        // Redis原子扣减库存
-        Long newStock = redisTemplate.opsForValue().decrement(stockKey);
-        if (newStock == null || newStock < 0) {
-            // 回滚
-            redisTemplate.opsForValue().increment(stockKey);
+        if (result == 0) {
             throw new BusinessException(5004, "秒杀库存不足");
         }
 
         // 标记用户已购买
         redisTemplate.opsForSet().add(boughtKey, userId.toString());
         // 设置过期时间为活动结束时间
-        long expireSeconds = Duration.between(LocalDateTime.now(), activity.getEndTime()).getSeconds();
         if (expireSeconds > 0) {
             redisTemplate.expire(boughtKey, expireSeconds, TimeUnit.SECONDS);
         }
@@ -327,12 +409,30 @@ public class SeckillServiceImpl implements SeckillService {
     }
 
     /**
-     * 立即执行预热
+     * 立即执行预热（使用 Lua 脚本保证原子性）
      */
     private void doWarmUp(SeckillActivity activity) {
         String stockKey = MarketingConstants.SECKILL_STOCK_KEY_PREFIX + activity.getId();
-        redisTemplate.opsForValue().set(stockKey, activity.getTotalStock().toString());
-        log.info("秒杀库存预热完成, activityId: {}, stock: {}", activity.getId(), activity.getTotalStock());
+
+        // 计算过期时间
+        long expireSeconds = Duration.between(LocalDateTime.now(), activity.getEndTime()).getSeconds();
+        if (expireSeconds <= 0) {
+            expireSeconds = MarketingConstants.SECKILL_STOCK_PRELOAD_MINUTES * 60L;
+        }
+
+        // 使用 Lua 脚本原子预热
+        Long result = redisTemplate.execute(
+                warmUpStockScript,
+                Collections.singletonList(stockKey),
+                activity.getTotalStock().toString(),
+                String.valueOf(expireSeconds)
+        );
+
+        if (result != null && result == 1) {
+            log.info("秒杀库存预热完成: activityId={}, stock={}", activity.getId(), activity.getTotalStock());
+        } else {
+            log.debug("秒杀库存已存在，跳过预热: activityId={}", activity.getId());
+        }
     }
 
     @Override
@@ -388,15 +488,32 @@ public class SeckillServiceImpl implements SeckillService {
     public List<TodaySeckillVO> getTodaySeckills(Long userId) {
         List<SeckillActivity> activities = activityMapper.selectTodayActivities();
 
+        if (activities.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 转换为 VO 列表
+        List<SeckillActivityVO> voList = activities.stream()
+                .map(this::convertToVO)
+                .collect(java.util.stream.Collectors.toList());
+
+        // 批量查询提醒状态（解决 N+1 问题）
+        if (userId != null && !voList.isEmpty()) {
+            List<Long> activityIds = voList.stream()
+                    .map(SeckillActivityVO::getId)
+                    .collect(java.util.stream.Collectors.toList());
+            java.util.Set<Long> remindedActivityIds = reminderMapper.selectRemindedActivityIds(userId, activityIds);
+            voList.forEach(vo -> vo.setReminded(remindedActivityIds.contains(vo.getId())));
+        }
+
         // 按时间段分组
         Map<String, List<SeckillActivityVO>> timeSlotMap = new HashMap<>();
-        for (SeckillActivity activity : activities) {
-            String timeSlot = activity.getStartTime().toLocalTime().toString().substring(0, 5);
-            SeckillActivityVO vo = convertToVO(activity);
-            if (userId != null) {
-                int count = reminderMapper.countByUserAndActivity(userId, activity.getId());
-                vo.setReminded(count > 0);
-            }
+        for (SeckillActivityVO vo : voList) {
+            String timeSlot = activities.stream()
+                    .filter(a -> a.getId().equals(vo.getId()))
+                    .findFirst()
+                    .map(a -> a.getStartTime().toLocalTime().toString().substring(0, 5))
+                    .orElse("00:00");
             timeSlotMap.computeIfAbsent(timeSlot, k -> new ArrayList<>()).add(vo);
         }
 
@@ -408,7 +525,7 @@ public class SeckillServiceImpl implements SeckillService {
                     .build());
         });
 
-        result.sort((a, b) -> a.getTimeSlot().compareTo(b.getTimeSlot()));
+        result.sort(java.util.Comparator.comparing(TodaySeckillVO::getTimeSlot));
         return result;
     }
 
@@ -476,15 +593,23 @@ public class SeckillServiceImpl implements SeckillService {
             // 获取需要提醒的用户
             List<Long> userIds = reminderMapper.selectUserIdsByActivity(activity.getId());
             if (!userIds.isEmpty()) {
-                // 查询商品名称
+                // 使用缓存查询商品名称
                 String productName = null;
-                try {
-                    var result = productClient.getProductById(activity.getProductId());
-                    if (result != null && result.isSuccess() && result.getData() != null) {
-                        productName = result.getData().getProductName();
+                Long productId = activity.getProductId();
+                ProductVO product = productCache.get(productId, key -> {
+                    try {
+                        var result = productClient.getProductById(key);
+                        if (result != null && result.isSuccess() && result.getData() != null) {
+                            return result.getData();
+                        }
+                    } catch (Exception e) {
+                        log.warn("获取商品名称失败: productId={}", key);
                     }
-                } catch (Exception e) {
-                    log.warn("获取商品名称失败: productId={}", activity.getProductId());
+                    return null;
+                });
+
+                if (product != null) {
+                    productName = product.getProductName();
                 }
 
                 // 发送 MQ 消息异步推送提醒
@@ -554,17 +679,24 @@ public class SeckillServiceImpl implements SeckillService {
         SeckillActivityVO vo = new SeckillActivityVO();
         BeanUtils.copyProperties(activity, vo);
 
-        // 查询商品信息填充商品名称、图片、原价
-        try {
-            var result = productClient.getProductById(activity.getProductId());
-            if (result != null && result.isSuccess() && result.getData() != null) {
-                ProductVO product = result.getData();
-                vo.setProductName(product.getProductName());
-                vo.setProductImage(product.getMainImageUrl());
-                vo.setOriginalPrice(product.getPrice());
+        // 使用缓存查询商品信息
+        Long productId = activity.getProductId();
+        ProductVO product = productCache.get(productId, key -> {
+            try {
+                var result = productClient.getProductById(key);
+                if (result != null && result.isSuccess() && result.getData() != null) {
+                    return result.getData();
+                }
+            } catch (Exception e) {
+                log.warn("获取秒杀商品信息失败: productId={}", key);
             }
-        } catch (Exception e) {
-            log.warn("获取秒杀商品信息失败: productId={}", activity.getProductId());
+            return null;
+        });
+
+        if (product != null) {
+            vo.setProductName(product.getProductName());
+            vo.setProductImage(product.getMainImageUrl());
+            vo.setOriginalPrice(product.getPrice());
         }
 
         return vo;

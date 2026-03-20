@@ -22,6 +22,7 @@ import java.util.UUID;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection")
 public class OrderMessageProducer {
 
     private final RocketMQTemplate rocketMQTemplate;

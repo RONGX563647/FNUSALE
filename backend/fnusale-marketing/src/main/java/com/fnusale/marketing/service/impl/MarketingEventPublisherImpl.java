@@ -27,6 +27,7 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection")
 public class MarketingEventPublisherImpl implements MarketingEventPublisher {
 
     private final RocketMQTemplate rocketMQTemplate;

@@ -80,7 +80,7 @@ class UserServiceImplTest {
 
     @AfterEach
     void tearDown() {
-        UserServiceImpl.clearCurrentUserId();
+       // UserServiceImpl.clearCurrentUserId();
     }
 
     @Nested

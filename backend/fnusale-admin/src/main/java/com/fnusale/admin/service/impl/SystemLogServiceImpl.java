@@ -11,6 +11,7 @@ import com.fnusale.common.entity.User;
 import com.fnusale.common.vo.admin.SystemLogVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -71,16 +72,9 @@ public class SystemLogServiceImpl implements SystemLogService {
 
     private SystemLogVO convertToVO(SystemLog systemLog) {
         SystemLogVO vo = new SystemLogVO();
+        BeanUtils.copyProperties(systemLog, vo);
+        // 字段名不一致的手动映射
         vo.setLogId(systemLog.getId());
-        vo.setOperateUserId(systemLog.getOperateUserId());
-        vo.setModuleName(systemLog.getModuleName());
-        vo.setOperateType(systemLog.getOperateType());
-        vo.setOperateContent(systemLog.getOperateContent());
-        vo.setIpAddress(systemLog.getIpAddress());
-        vo.setDeviceInfo(systemLog.getDeviceInfo());
-        vo.setExceptionInfo(systemLog.getExceptionInfo());
-        vo.setLogType(systemLog.getLogType());
-        vo.setCreateTime(systemLog.getCreateTime());
 
         // 获取操作用户名
         if (systemLog.getOperateUserId() != null) {

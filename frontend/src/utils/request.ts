@@ -1,6 +1,7 @@
 import axios, { type AxiosInstance, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getToken, removeToken } from '@/utils/auth'
+import { logger } from '@/utils/logger'
 import type { Result } from '@/types/api'
 
 // 创建 axios 实例
@@ -22,7 +23,7 @@ service.interceptors.request.use(
     return config
   },
   (error) => {
-    console.error('Request error:', error)
+    logger.error('HTTP', '请求拦截器错误', error)
     return Promise.reject(error)
   }
 )
@@ -54,7 +55,7 @@ service.interceptors.response.use(
     return response
   },
   (error) => {
-    console.error('Response error:', error)
+    logger.error('HTTP', `响应错误: ${error.response?.status || 'unknown'}`, error)
 
     let message = '网络错误，请稍后重试'
     if (error.response) {

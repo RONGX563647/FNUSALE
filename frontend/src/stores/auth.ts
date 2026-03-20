@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import type { AdminInfo, LoginRequest, LoginResponse } from '@/types/auth'
 import { setToken, removeToken, getToken, isAuthenticated } from '@/utils/auth'
 import { ElMessage } from 'element-plus'
+import { logger } from '@/utils/logger'
 
 export const useAuthStore = defineStore('auth', () => {
   const adminInfo = ref<AdminInfo | null>(null)
@@ -35,7 +36,7 @@ export const useAuthStore = defineStore('auth', () => {
       ElMessage.success('登录成功')
       return true
     } catch (error) {
-      console.error('Login failed:', error)
+      logger.error('Auth', '登录失败', error)
       return false
     }
   }
@@ -45,7 +46,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       // await authApi.logout()
     } catch (error) {
-      console.error('Logout API failed:', error)
+      logger.error('Auth', '退出登录接口调用失败', error)
     } finally {
       removeToken()
       adminInfo.value = null
@@ -70,7 +71,7 @@ export const useAuthStore = defineStore('auth', () => {
         createTime: '2024-01-01T00:00:00'
       }
     } catch (error) {
-      console.error('Fetch admin info failed:', error)
+      logger.error('Auth', '获取管理员信息失败', error)
       removeToken()
       adminInfo.value = null
     }

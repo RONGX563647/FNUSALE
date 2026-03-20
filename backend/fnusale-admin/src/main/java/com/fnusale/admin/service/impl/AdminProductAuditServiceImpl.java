@@ -160,7 +160,7 @@ public class AdminProductAuditServiceImpl implements AdminProductAuditService {
                 auditPass(productId, adminId);
                 successCount++;
             } catch (Exception e) {
-                log.warn("批量审核失败, productId: {}, error: {}", productId, e.getMessage());
+                log.warn("批量审核失败, productId: {}", productId, e);
             }
         }
 

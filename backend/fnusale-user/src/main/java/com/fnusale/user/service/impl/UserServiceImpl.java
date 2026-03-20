@@ -66,6 +66,9 @@ public class UserServiceImpl implements UserService {
     private static final long LOCK_WAIT_TIME = 0;
     private static final long LOCK_LEASE_TIME = 30;
 
+    public static void setCurrentUserId(long l) {
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void registerByPhone(UserRegisterDTO dto) {
@@ -577,7 +580,7 @@ public class UserServiceImpl implements UserService {
      * 清除用户缓存
      */
     @CacheEvict(value = "userInfo", key = "#userId")
-    private void evictUserCache(Long userId) {
+    public void evictUserCache(Long userId) {
         log.debug("清除用户缓存，userId: {}", userId);
     }
 }

@@ -8,6 +8,7 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * 秒杀提醒 Mapper
@@ -38,4 +39,17 @@ public interface SeckillReminderMapper extends BaseMapper<SeckillReminder> {
      */
     @Update("DELETE FROM t_seckill_reminder WHERE user_id = #{userId} AND activity_id = #{activityId}")
     int deleteByUserAndActivity(@Param("userId") Long userId, @Param("activityId") Long activityId);
+
+    /**
+     * 批量查询用户已设置提醒的活动ID
+     * 解决 N+1 查询问题
+     */
+    @Select("<script>" +
+            "SELECT DISTINCT activity_id FROM t_seckill_reminder " +
+            "WHERE user_id = #{userId} AND activity_id IN " +
+            "<foreach item='id' collection='activityIds' open='(' separator=',' close=')'>" +
+            "#{id}" +
+            "</foreach>" +
+            "</script>")
+    Set<Long> selectRemindedActivityIds(@Param("userId") Long userId, @Param("activityIds") List<Long> activityIds);
 }

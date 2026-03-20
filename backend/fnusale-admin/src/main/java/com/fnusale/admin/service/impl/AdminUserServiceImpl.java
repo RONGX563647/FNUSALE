@@ -20,6 +20,7 @@ import com.fnusale.common.exception.BusinessException;
 import com.fnusale.common.vo.admin.UserDetailVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -220,15 +221,9 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     private UserDetailVO convertToVO(User user) {
         UserDetailVO vo = new UserDetailVO();
+        BeanUtils.copyProperties(user, vo);
+        // 字段名不一致的手动映射
         vo.setUserId(user.getId());
-        vo.setUsername(user.getUsername());
-        vo.setIdentityType(user.getIdentityType());
-        vo.setAuthStatus(user.getAuthStatus());
-        vo.setAuthResultRemark(user.getAuthResultRemark());
-        vo.setAuthImageUrl(user.getAuthImageUrl());
-        vo.setCreditScore(user.getCreditScore());
-        vo.setAvatarUrl(user.getAvatarUrl());
-        vo.setBirthday(user.getBirthday());
         vo.setRegisterTime(user.getCreateTime());
 
         // 脱敏处理
@@ -238,7 +233,6 @@ public class AdminUserServiceImpl implements AdminUserService {
         if (user.getStudentTeacherId() != null) {
             vo.setStudentTeacherId(maskId(user.getStudentTeacherId()));
         }
-        vo.setCampusEmail(user.getCampusEmail());
 
         return vo;
     }

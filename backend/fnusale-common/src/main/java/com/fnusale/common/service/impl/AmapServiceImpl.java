@@ -125,7 +125,7 @@ public class AmapServiceImpl implements AmapService {
             }
             return false;
         } catch (Exception e) {
-            log.error("多边形围栏校验失败，使用本地计算: {}", e.getMessage());
+            log.error("多边形围栏校验失败，使用本地计算", e);
             return isInPolygonLocal(longitude, latitude, polygon);
         }
     }
@@ -152,7 +152,7 @@ public class AmapServiceImpl implements AmapService {
             }
             return false;
         } catch (Exception e) {
-            log.error("圆形围栏校验失败，使用本地计算: {}", e.getMessage());
+            log.error("圆形围栏校验失败，使用本地计算", e);
             return isInCircleLocal(longitude, latitude, centerLng, centerLat, radius);
         }
     }
@@ -194,7 +194,7 @@ public class AmapServiceImpl implements AmapService {
                 }
             }
         } catch (Exception e) {
-            log.error("距离计算失败: {}", e.getMessage());
+            log.error("距离计算失败", e);
         }
 
         return results;
@@ -255,10 +255,10 @@ public class AmapServiceImpl implements AmapService {
         try {
             return apiCall.get();
         } catch (RestClientException e) {
-            log.error("{}请求失败: {}", apiName, e.getMessage());
+            log.error("{}请求失败", apiName, e);
             return fallback.get();
         } catch (Exception e) {
-            log.error("{}解析失败: {}", apiName, e.getMessage());
+            log.error("{}解析失败", apiName, e);
             return fallback.get();
         }
     }
@@ -385,7 +385,7 @@ public class AmapServiceImpl implements AmapService {
                     points
             );
         } catch (Exception e) {
-            log.error("本地多边形围栏计算失败: {}", e.getMessage());
+            log.error("本地多边形围栏计算失败", e);
             return false;
         }
     }
@@ -404,7 +404,7 @@ public class AmapServiceImpl implements AmapService {
                     radius
             );
         } catch (Exception e) {
-            log.error("本地圆形围栏计算失败: {}", e.getMessage());
+            log.error("本地圆形围栏计算失败", e);
             return false;
         }
     }

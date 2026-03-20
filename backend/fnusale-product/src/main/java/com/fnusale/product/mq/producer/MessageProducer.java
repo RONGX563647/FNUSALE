@@ -7,6 +7,8 @@ import com.fnusale.product.mq.message.UserBehaviorMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
+import org.apache.rocketmq.client.producer.SendCallback;
+import org.apache.rocketmq.client.producer.SendResult;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +20,7 @@ import java.util.UUID;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection")
 public class MessageProducer {
 
     private final RocketMQTemplate rocketMQTemplate;
@@ -68,15 +71,17 @@ public class MessageProducer {
             rocketMQTemplate.asyncSend(
                     destination,
                     MessageBuilder.withPayload(message).build(),
-                    new org.apache.rocketmq.spring.core.RocketMQLocalTransactionCallback() {
+                    new SendCallback() {
                         @Override
-                        public void executeLocalTransaction(org.springframework.messaging.Message msg, Object arg) {
-                            // 异步发送，无需本地事务
+                        public void onSuccess(SendResult sendResult) {
+                            log.debug("异步发送用户行为消息成功: messageId={}, msgId={}",
+                                    message.getMessageId(), sendResult.getMsgId());
                         }
 
                         @Override
-                        public org.apache.rocketmq.spring.core.RocketMQLocalTransactionState checkLocalTransaction(org.springframework.messaging.Message msg) {
-                            return org.apache.rocketmq.spring.core.RocketMQLocalTransactionState.COMMIT;
+                        public void onException(Throwable e) {
+                            log.error("异步发送用户行为消息失败: messageId={}",
+                                    message.getMessageId(), e);
                         }
                     }
             );

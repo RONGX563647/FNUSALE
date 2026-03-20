@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection")
 public class UserRegisterEventPublisherImpl implements UserRegisterEventPublisher {
 
     private final RocketMQTemplate rocketMQTemplate;

@@ -18,6 +18,7 @@ import com.fnusale.common.exception.BusinessException;
 import com.fnusale.common.vo.admin.DisputeVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -112,12 +113,9 @@ public class AdminDisputeServiceImpl implements AdminDisputeService {
 
     private DisputeVO convertToVO(TradeDispute dispute) {
         DisputeVO vo = new DisputeVO();
+        BeanUtils.copyProperties(dispute, vo);
+        // 字段名不一致的手动映射
         vo.setDisputeId(dispute.getId());
-        vo.setOrderId(dispute.getOrderId());
-        vo.setDisputeType(dispute.getDisputeType());
-        vo.setDisputeStatus(dispute.getDisputeStatus());
-        vo.setProcessResult(dispute.getProcessResult());
-        vo.setCreateTime(dispute.getCreateTime());
 
         // 获取发起者信息
         User initiator = userMapper.selectById(dispute.getInitiatorId());

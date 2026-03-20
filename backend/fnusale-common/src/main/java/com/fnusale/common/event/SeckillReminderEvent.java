@@ -5,7 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -17,9 +16,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SeckillReminderEvent implements Serializable {
-
-    private static final long serialVersionUID = 1L;
+public class SeckillReminderEvent {
 
     /**
      * 秒杀活动ID

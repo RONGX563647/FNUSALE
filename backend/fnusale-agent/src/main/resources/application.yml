@@ -25,12 +25,24 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:redis123456}
       database: 0
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+          max-wait: 3000ms
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3307}/fnusale?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
     username: ${MYSQL_USER:fnusale}
     password: ${MYSQL_PASSWORD:fnusale123456}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 30000
+      pool-name: FnusaleAgentHikariPool
 
 # 阿里云通义千问配置
 dashscope:
@@ -45,7 +57,7 @@ mybatis-plus:
   type-aliases-package: com.fnusale.common.entity
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
 
 # Knife4j API文档配置
 knife4j:
@@ -56,7 +68,7 @@ knife4j:
 # 日志配置
 logging:
   level:
-    com.fnusale: debug
+    com.fnusale: info
     com.alibaba.cloud: info
 
 # Actuator 监控配置

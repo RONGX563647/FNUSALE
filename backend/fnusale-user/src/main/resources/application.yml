@@ -13,12 +13,24 @@ spring:
     url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3307}/${MYSQL_DATABASE:fnusale}?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: ${MYSQL_USER:fnusale}
     password: ${MYSQL_PASSWORD:fnusale123456}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 30000
+      pool-name: FnusaleUserHikariPool
   data:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:redis123456}
       database: 0
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+          max-wait: 3000ms
     mail:
       host: smtp.163.com
       port: 465
@@ -78,7 +90,8 @@ mybatis-plus:
       logic-not-delete-value: 0
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # 生产环境应使用 NoLoggingImpl，开发环境使用 StdOutImpl
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
 
 # Knife4j 配置
 springdoc:
@@ -98,7 +111,7 @@ knife4j:
 
 logging:
   level:
-    com.fnusale: debug
+    com.fnusale: info
 
 # RocketMQ 配置
 rocketmq:

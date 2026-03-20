@@ -34,9 +34,14 @@
 
     <!-- 异步 Logstash 输出，避免阻塞业务线程 -->
     <appender name="ASYNC_LOGSTASH" class="ch.qos.logback.classic.AsyncAppender">
-        <queueSize>512</queueSize>
-        <discardingThreshold>0</discardingThreshold>
-        <includeCallerData>true</includeCallerData>
+        <!-- 队列大小增大，避免高并发时溢出 -->
+        <queueSize>2048</queueSize>
+        <!-- 队列剩余20%时开始丢弃DEBUG/TRACE日志，保留WARN/ERROR -->
+        <discardingThreshold>20</discardingThreshold>
+        <!-- 关闭调用栈信息，大幅降低CPU开销 -->
+        <includeCallerData>false</includeCallerData>
+        <!-- 永不阻塞：队列满时丢弃日志而非阻塞 -->
+        <neverBlock>true</neverBlock>
         <appender-ref ref="LOGSTASH"/>
     </appender>
 
@@ -62,7 +67,7 @@
     </springProfile>
 
     <!-- 包级别日志配置 -->
-    <logger name="com.fnusale" level="DEBUG"/>
+    <logger name="com.fnusale" level="INFO"/>
     <logger name="org.springframework" level="WARN"/>
     <logger name="org.springframework.boot" level="INFO"/>
     <logger name="org.apache.ibatis" level="WARN"/>

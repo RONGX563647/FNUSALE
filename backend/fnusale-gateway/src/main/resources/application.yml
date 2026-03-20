@@ -95,6 +95,12 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:redis123456}
       database: 0
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+          max-wait: 3000ms
 
 # Knife4j 网关配置
 knife4j:
@@ -107,8 +113,8 @@ knife4j:
 
 logging:
   level:
-    com.fnusale: debug
-    org.springframework.cloud.gateway: debug
+    com.fnusale: info
+    org.springframework.cloud.gateway: warn
 
 # Actuator 监控配置
 management:

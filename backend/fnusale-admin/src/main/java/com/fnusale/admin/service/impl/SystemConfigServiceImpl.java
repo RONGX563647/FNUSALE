@@ -16,6 +16,7 @@ import com.fnusale.common.entity.SystemConfigHistory;
 import com.fnusale.common.vo.admin.ConfigVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -195,22 +196,16 @@ public class SystemConfigServiceImpl implements SystemConfigService {
 
     private ConfigVO convertToVO(SystemConfig config) {
         ConfigVO vo = new ConfigVO();
-        vo.setId(config.getId());
-        vo.setConfigKey(config.getConfigKey());
-        vo.setConfigValue(config.getConfigValue());
-        vo.setConfigDesc(config.getConfigDesc());
-        vo.setUpdateTime(config.getUpdateTime());
-        vo.setAdminId(config.getAdminId());
+        BeanUtils.copyProperties(config, vo);
         return vo;
     }
 
     private ConfigVO convertHistoryToVO(SystemConfigHistory history) {
         ConfigVO vo = new ConfigVO();
-        vo.setId(history.getId());
-        vo.setConfigKey(history.getConfigKey());
+        BeanUtils.copyProperties(history, vo, "configValue", "updateTime");
+        // 字段名不一致的手动映射
         vo.setConfigValue(history.getNewValue());
         vo.setUpdateTime(history.getOperateTime());
-        vo.setAdminId(history.getAdminId());
         return vo;
     }
 }

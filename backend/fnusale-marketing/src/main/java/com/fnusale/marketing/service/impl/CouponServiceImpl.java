@@ -359,35 +359,29 @@ public class CouponServiceImpl implements CouponService {
      * 优化：优先使用JOIN查询返回的优惠券信息，避免N+1问题
      */
     private UserCouponVO convertToUserCouponVO(UserCoupon userCoupon) {
-        UserCouponVO.UserCouponVOBuilder builder = UserCouponVO.builder()
-                .id(userCoupon.getId())
-                .couponId(userCoupon.getCouponId())
-                .couponStatus(userCoupon.getCouponStatus())
-                .receiveTime(userCoupon.getReceiveTime())
-                .useTime(userCoupon.getUseTime())
-                .expireTime(userCoupon.getExpireTime())
-                .orderId(userCoupon.getOrderId());
+        UserCouponVO vo = new UserCouponVO();
+        BeanUtils.copyProperties(userCoupon, vo);
 
         // 优先使用JOIN查询返回的优惠券信息（避免N+1问题）
         if (userCoupon.getCouponName() != null) {
-            builder.couponName(userCoupon.getCouponName())
-                    .couponType(userCoupon.getCouponType())
-                    .fullAmount(userCoupon.getFullAmount())
-                    .reduceAmount(userCoupon.getReduceAmount())
-                    .categoryId(userCoupon.getCategoryId());
+            vo.setCouponName(userCoupon.getCouponName());
+            vo.setCouponType(userCoupon.getCouponType());
+            vo.setFullAmount(userCoupon.getFullAmount());
+            vo.setReduceAmount(userCoupon.getReduceAmount());
+            vo.setCategoryId(userCoupon.getCategoryId());
         } else {
             // 仅在JOIN未返回信息时单独查询（兜底）
             Coupon coupon = couponMapper.selectById(userCoupon.getCouponId());
             if (coupon != null) {
-                builder.couponName(coupon.getCouponName())
-                        .couponType(coupon.getCouponType())
-                        .fullAmount(coupon.getFullAmount())
-                        .reduceAmount(coupon.getReduceAmount())
-                        .categoryId(coupon.getCategoryId());
+                vo.setCouponName(coupon.getCouponName());
+                vo.setCouponType(coupon.getCouponType());
+                vo.setFullAmount(coupon.getFullAmount());
+                vo.setReduceAmount(coupon.getReduceAmount());
+                vo.setCategoryId(coupon.getCategoryId());
             }
         }
 
-        return builder.build();
+        return vo;
     }
 
     /**

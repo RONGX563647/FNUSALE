@@ -5,7 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -17,9 +16,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CouponExpireReminderEvent implements Serializable {
-
-    private static final long serialVersionUID = 1L;
+public class CouponExpireReminderEvent {
 
     /**
      * 用户优惠券ID
@@ -68,9 +65,7 @@ public class CouponExpireReminderEvent implements Serializable {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class UserCouponInfo implements Serializable {
-        private static final long serialVersionUID = 1L;
-
+    public static class UserCouponInfo {
         private Long userCouponId;
         private Long userId;
         private String couponName;
