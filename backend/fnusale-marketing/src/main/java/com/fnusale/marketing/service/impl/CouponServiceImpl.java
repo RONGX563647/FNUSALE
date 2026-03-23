@@ -2,9 +2,13 @@ package com.fnusale.marketing.service.impl;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fnusale.common.constant.LocalMessageStatus;
 import com.fnusale.common.constant.MarketingConstants;
+import com.fnusale.common.constant.RocketMQConstants;
 import com.fnusale.common.dto.marketing.CouponDTO;
 import com.fnusale.common.entity.Coupon;
+import com.fnusale.common.entity.LocalMessage;
 import com.fnusale.common.entity.UserCoupon;
 import com.fnusale.common.event.CouponGrantEvent;
 import com.fnusale.common.event.CouponReceiveEvent;
@@ -12,6 +16,7 @@ import com.fnusale.common.exception.BusinessException;
 import com.fnusale.common.vo.marketing.CouponVO;
 import com.fnusale.common.vo.marketing.UserCouponVO;
 import com.fnusale.marketing.mapper.CouponMapper;
+import com.fnusale.marketing.mapper.LocalMessageMapper;
 import com.fnusale.marketing.mapper.UserCouponMapper;
 import com.fnusale.marketing.service.CouponService;
 import com.fnusale.marketing.service.MarketingEventPublisher;
@@ -39,8 +44,10 @@ public class CouponServiceImpl implements CouponService {
 
     private final CouponMapper couponMapper;
     private final UserCouponMapper userCouponMapper;
+    private final LocalMessageMapper localMessageMapper;
     private final MarketingEventPublisher eventPublisher;
     private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
 
     /**
      * 优惠券库存 Redis Key 前缀
@@ -133,7 +140,7 @@ public class CouponServiceImpl implements CouponService {
         // 标记用户已领取（防止重复领取）
         redisTemplate.opsForSet().add(receivedKey, userId.toString());
 
-        // ========== 发送 MQ 消息异步写入数据库 ==========
+        // ========== 本地消息表确保最终一致性 ==========
         String eventId = UUID.randomUUID().toString();
         CouponReceiveEvent event = CouponReceiveEvent.builder()
                 .couponId(couponId)
@@ -143,7 +150,39 @@ public class CouponServiceImpl implements CouponService {
                 .receiveTime(now)
                 .build();
 
-        eventPublisher.publishCouponReceiveEvent(event);
+        try {
+            String messageContent = objectMapper.writeValueAsString(event);
+
+            LocalMessage localMessage = LocalMessage.builder()
+                    .messageId(eventId)
+                    .messageType("COUPON_RECEIVE")
+                    .topic(RocketMQConstants.COUPON_RECEIVE_TOPIC)
+                    .tag(RocketMQConstants.COUPON_RECEIVE_TAG_RECEIVE)
+                    .messageContent(messageContent)
+                    .status(LocalMessageStatus.PENDING)
+                    .retryCount(0)
+                    .maxRetryCount(LocalMessageStatus.DEFAULT_MAX_RETRY_COUNT)
+                    .nextRetryTime(LocalDateTime.now())
+                    .createTime(LocalDateTime.now())
+                    .updateTime(LocalDateTime.now())
+                    .build();
+            localMessageMapper.insert(localMessage);
+
+            boolean sent = eventPublisher.sendSync(
+                    RocketMQConstants.COUPON_RECEIVE_TOPIC,
+                    RocketMQConstants.COUPON_RECEIVE_TAG_RECEIVE,
+                    event
+            );
+
+            if (sent) {
+                localMessageMapper.updateToSent(localMessage.getId());
+                log.info("优惠券领取消息发送成功: eventId={}", eventId);
+            } else {
+                log.warn("优惠券领取消息发送失败，将由定时任务重试: eventId={}", eventId);
+            }
+        } catch (Exception e) {
+            log.error("优惠券领取消息处理异常: eventId={}", eventId, e);
+        }
 
         log.info("用户 {} 领取优惠券 {} 成功（异步入库中），eventId: {}", userId, couponId, eventId);
     }

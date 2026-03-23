@@ -47,7 +47,6 @@ public class UserBehaviorServiceImpl implements UserBehaviorService {
         behavior.setUserId(userId);
         behavior.setProductId(productId);
         behavior.setBehaviorType(BehaviorType.COLLECT.getCode());
-        behavior.setBehaviorTime(LocalDateTime.now());
         behavior.setCreateTime(LocalDateTime.now());
 
         userBehaviorMapper.insert(behavior);
@@ -94,7 +93,6 @@ public class UserBehaviorServiceImpl implements UserBehaviorService {
         behavior.setUserId(userId);
         behavior.setProductId(productId);
         behavior.setBehaviorType(BehaviorType.LIKE.getCode());
-        behavior.setBehaviorTime(LocalDateTime.now());
         behavior.setCreateTime(LocalDateTime.now());
 
         userBehaviorMapper.insert(behavior);
@@ -139,7 +137,6 @@ public class UserBehaviorServiceImpl implements UserBehaviorService {
         behavior.setUserId(userId);
         behavior.setProductId(productId);
         behavior.setBehaviorType(BehaviorType.BROWSE.getCode());
-        behavior.setBehaviorTime(LocalDateTime.now());
         behavior.setCreateTime(LocalDateTime.now());
 
         userBehaviorMapper.insert(behavior);

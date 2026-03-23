@@ -230,6 +230,19 @@ CREATE TABLE IF NOT EXISTS `t_admin` (
     UNIQUE KEY `uk_username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='管理员表';
 
+-- 管理员权限表
+CREATE TABLE IF NOT EXISTS `t_admin_permission` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `admin_id` bigint NOT NULL COMMENT '管理员ID',
+    `permission_code` varchar(50) NOT NULL COMMENT '权限代码（如user:manage）',
+    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_deleted` tinyint DEFAULT 0 COMMENT '逻辑删除标记（0-未删除, 1-已删除）',
+    PRIMARY KEY (`id`),
+    KEY `idx_admin_id` (`admin_id`),
+    UNIQUE KEY `uk_admin_permission` (`admin_id`, `permission_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='管理员权限表';
+
 -- 商品品类表
 CREATE TABLE IF NOT EXISTS `t_product_category` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
@@ -390,7 +403,8 @@ CREATE TABLE IF NOT EXISTS `t_im_session` (
     PRIMARY KEY (`id`),
     KEY `idx_user1_id` (`user1_id`),
     KEY `idx_user2_id` (`user2_id`),
-    KEY `idx_product_id` (`product_id`)
+    KEY `idx_product_id` (`product_id`),
+    KEY `idx_users_product` (`user1_id`, `user2_id`, `product_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='聊天会话表';
 
 -- 聊天消息表
@@ -439,12 +453,11 @@ CREATE TABLE IF NOT EXISTS `t_user_behavior` (
     `user_id` bigint NOT NULL COMMENT '用户ID',
     `product_id` bigint NOT NULL COMMENT '商品ID',
     `behavior_type` varchar(20) NOT NULL COMMENT '行为类型（BROWSE/COLLECT/LIKE）',
-    `behavior_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '行为时间',
-    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '行为时间',
     PRIMARY KEY (`id`),
     KEY `idx_user_id` (`user_id`),
     KEY `idx_product_id` (`product_id`),
-    KEY `idx_behavior_time` (`behavior_time`)
+    KEY `idx_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户行为表';
 
 -- ==================== 营销相关表 ====================
@@ -481,7 +494,8 @@ CREATE TABLE IF NOT EXISTS `t_user_coupon` (
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`),
     KEY `idx_user_id` (`user_id`),
-    KEY `idx_coupon_id` (`coupon_id`)
+    KEY `idx_coupon_id` (`coupon_id`),
+    KEY `idx_user_status` (`user_id`, `coupon_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户优惠券表';
 
 -- 秒杀活动表
@@ -499,7 +513,8 @@ CREATE TABLE IF NOT EXISTS `t_seckill_activity` (
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     KEY `idx_product_id` (`product_id`),
-    KEY `idx_start_time` (`start_time`)
+    KEY `idx_start_time` (`start_time`),
+    KEY `idx_status_start` (`activity_status`, `start_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='秒杀活动表';
 
 -- 秒杀提醒表
@@ -648,6 +663,22 @@ CREATE TABLE IF NOT EXISTS `t_alert_record` (
     KEY `idx_handle_status` (`handle_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='告警记录表';
 
+-- 邮件发送日志表
+CREATE TABLE IF NOT EXISTS `t_email_log` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `to_email` varchar(100) NOT NULL COMMENT '收件人邮箱',
+    `subject` varchar(200) DEFAULT NULL COMMENT '邮件主题',
+    `content` text COMMENT '邮件内容',
+    `send_status` varchar(20) DEFAULT 'SUCCESS' COMMENT '发送状态（SUCCESS/FAILED）',
+    `error_message` varchar(500) DEFAULT NULL COMMENT '错误信息',
+    `send_time` datetime DEFAULT NULL COMMENT '发送时间',
+    `retry_count` int DEFAULT 0 COMMENT '重试次数',
+    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_to_email` (`to_email`),
+    KEY `idx_send_time` (`send_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='邮件发送日志表';
+
 -- 运营数据统计表
 CREATE TABLE IF NOT EXISTS `t_operation_statistics` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
@@ -791,9 +822,36 @@ CREATE TABLE IF NOT EXISTS `t_ranking_reward_log` (
     KEY `idx_rank_type_date` (`rank_type`, `rank_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='排行榜奖励记录表';
 
+-- ==================== 本地消息表 ====================
+
+-- 本地消息表（用于分布式事务最终一致性）
+CREATE TABLE IF NOT EXISTS `t_local_message` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `message_id` varchar(64) NOT NULL COMMENT '消息唯一ID',
+    `message_type` varchar(32) NOT NULL COMMENT '消息类型',
+    `topic` varchar(64) NOT NULL COMMENT '目标Topic',
+    `tag` varchar(32) DEFAULT NULL COMMENT '目标Tag',
+    `message_content` text NOT NULL COMMENT '消息内容（JSON）',
+    `status` varchar(16) NOT NULL DEFAULT 'PENDING' COMMENT '状态（PENDING/SENT/FAILED）',
+    `retry_count` int NOT NULL DEFAULT 0 COMMENT '重试次数',
+    `max_retry_count` int NOT NULL DEFAULT 5 COMMENT '最大重试次数',
+    `next_retry_time` datetime NOT NULL COMMENT '下次重试时间',
+    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `remark` varchar(255) DEFAULT NULL COMMENT '备注信息',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_message_id` (`message_id`),
+    KEY `idx_status_next_retry` (`status`, `next_retry_time`),
+    KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='本地消息表';
+
 -- ==================== 初始化数据 ====================
 
--- 插入默认快捷回复模板
+-- 插入默认管理员（密码: admin123，使用BCrypt加密）
+INSERT IGNORE INTO t_admin (id, username, password, nickname, role, status) VALUES
+(1, 'admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5EH', '超级管理员', 'SUPER_ADMIN', 1);
+
+-- 插入默认商品品类
 INSERT IGNORE INTO t_im_quick_reply (id, reply_content, enable_status, sort) VALUES
 (1, '几成新？', 1, 1),
 (2, '能小刀吗？', 1, 2),

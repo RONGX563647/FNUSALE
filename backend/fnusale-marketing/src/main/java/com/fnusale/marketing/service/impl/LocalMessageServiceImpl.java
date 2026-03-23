@@ -54,14 +54,42 @@ public class LocalMessageServiceImpl implements LocalMessageService {
 
         for (LocalMessage message : messages) {
             try {
-                // 发送消息到MQ
-                eventPublisher.sendRawMessage(message.getTopic(), message.getTag(), message.getMessageContent());
+                // 幂等性检查：避免重复发送
+                LocalMessage latestMessage = localMessageMapper.selectByMessageId(message.getMessageId());
+                if (latestMessage == null) {
+                    log.warn("消息已被删除，跳过: messageId={}", message.getMessageId());
+                    continue;
+                }
 
-                // 更新为已发送
-                localMessageMapper.updateToSent(message.getId());
-                log.info("消息发送成功: messageId={}", message.getMessageId());
+                // 如果消息已发送，跳过
+                if (LocalMessageStatus.SENT.equals(latestMessage.getStatus())) {
+                    log.debug("消息已发送，跳过: messageId={}", message.getMessageId());
+                    continue;
+                }
+
+                // 发送消息到MQ
+                try {
+                    eventPublisher.sendRawMessage(message.getTopic(), message.getTag(), message.getMessageContent());
+                    // 发送成功，更新为已发送
+                    localMessageMapper.updateToSent(message.getId());
+                    log.info("消息发送成功: messageId={}", message.getMessageId());
+                } catch (Exception sendEx) {
+                    // 发送失败，计算下次重试时间
+                    log.warn("消息发送失败: messageId={}, error={}", message.getMessageId(), sendEx.getMessage());
+                    int retryIndex = Math.min(message.getRetryCount(), LocalMessageStatus.RETRY_INTERVALS.length - 1);
+                    LocalDateTime nextRetryTime = LocalDateTime.now().plusMinutes(LocalMessageStatus.RETRY_INTERVALS[retryIndex]);
+
+                    // 更新为失败状态
+                    localMessageMapper.updateToFailed(message.getId(), nextRetryTime);
+
+                    // 如果超过最大重试次数，记录错误日志
+                    if (message.getRetryCount() + 1 >= message.getMaxRetryCount()) {
+                        log.error("消息超过最大重试次数，需要人工处理: messageId={}, content={}",
+                                message.getMessageId(), message.getMessageContent());
+                    }
+                }
             } catch (Exception e) {
-                log.error("消息发送失败: messageId={}, error={}", message.getMessageId(), e.getMessage());
+                log.error("消息处理异常: messageId={}, error={}", message.getMessageId(), e.getMessage());
 
                 // 计算下次重试时间
                 int retryIndex = Math.min(message.getRetryCount(), LocalMessageStatus.RETRY_INTERVALS.length - 1);

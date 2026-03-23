@@ -38,10 +38,5 @@ public class UserBehavior {
     /**
      * 行为时间
      */
-    private LocalDateTime behaviorTime;
-
-    /**
-     * 创建时间
-     */
     private LocalDateTime createTime;
 }

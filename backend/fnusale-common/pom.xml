@@ -121,7 +121,6 @@
         <dependency>
             <groupId>net.logstash.logback</groupId>
             <artifactId>logstash-logback-encoder</artifactId>
-            <scope>provided</scope>
         </dependency>
     </dependencies>
 

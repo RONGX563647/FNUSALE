@@ -2,8 +2,10 @@ package com.fnusale.marketing.mq.consumer;
 
 import com.fnusale.common.constant.RocketMQConstants;
 import com.fnusale.common.event.CouponExpireReminderEvent;
+import com.fnusale.marketing.config.IdempotentKeyConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.rocketmq.common.message.MessageModel;
 import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
 import org.apache.rocketmq.spring.core.RocketMQListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -21,7 +23,12 @@ import java.util.concurrent.TimeUnit;
 @RocketMQMessageListener(
         topic = RocketMQConstants.COUPON_EXPIRE_REMINDER_TOPIC,
         consumerGroup = "coupon-expire-reminder-consumer-group",
-        selectorExpression = RocketMQConstants.COUPON_EXPIRE_REMINDER_TAG_NOTIFY
+        selectorExpression = RocketMQConstants.COUPON_EXPIRE_REMINDER_TAG_NOTIFY,
+        maxReconsumeTimes = 2,
+        consumeThreadMin = 5,
+        consumeThreadMax = 10,
+        consumeTimeout = 5,
+        messageModel = MessageModel.CLUSTERING
 )
 @RequiredArgsConstructor
 public class CouponExpireReminderConsumer implements RocketMQListener<CouponExpireReminderEvent> {
@@ -37,20 +44,18 @@ public class CouponExpireReminderConsumer implements RocketMQListener<CouponExpi
 
         log.info("收到优惠券过期提醒消息, eventId: {}", eventId);
 
-        // 幂等性检查
         String idempotentKey = COUPON_EXPIRE_REMINDER_KEY_PREFIX + eventId;
-        Boolean success = redisTemplate.opsForValue().setIfAbsent(idempotentKey, "1", 24, TimeUnit.HOURS);
+        long expireSeconds = IdempotentKeyConfig.calculateLowPriorityExpireSeconds();
+        Boolean success = redisTemplate.opsForValue().setIfAbsent(idempotentKey, "1", expireSeconds, TimeUnit.SECONDS);
         if (Boolean.FALSE.equals(success)) {
             log.info("优惠券过期提醒已处理，跳过, eventId: {}", eventId);
             return;
         }
 
         try {
-            // 处理批量提醒
             if (event.getUserCouponList() != null && !event.getUserCouponList().isEmpty()) {
                 processBatchReminder(event);
             } else {
-                // 单个提醒
                 processSingleReminder(event);
             }
 
@@ -62,9 +67,6 @@ public class CouponExpireReminderConsumer implements RocketMQListener<CouponExpi
         }
     }
 
-    /**
-     * 处理批量提醒
-     */
     private void processBatchReminder(CouponExpireReminderEvent event) {
         for (CouponExpireReminderEvent.UserCouponInfo info : event.getUserCouponList()) {
             try {
@@ -77,17 +79,11 @@ public class CouponExpireReminderConsumer implements RocketMQListener<CouponExpi
         }
     }
 
-    /**
-     * 处理单个提醒
-     */
     private void processSingleReminder(CouponExpireReminderEvent event) {
         sendExpireNotification(event.getUserId(), event.getCouponName(),
                 event.getReduceAmount(), event.getExpireTime());
     }
 
-    /**
-     * 发送过期提醒通知
-     */
     private void sendExpireNotification(Long userId, String couponName,
                                          java.math.BigDecimal reduceAmount,
                                          java.time.LocalDateTime expireTime) {
@@ -95,9 +91,6 @@ public class CouponExpireReminderConsumer implements RocketMQListener<CouponExpi
         String title = "优惠券即将过期";
         String content = String.format("您的优惠券「%s」（优惠%.2f元）将于%s过期，请尽快使用！",
                 couponName, reduceAmount, expireDateStr);
-
-        // TODO: 调用 IM 服务发送站内消息
-        // imClient.sendSystemMessage(userId, title, content, "COUPON_EXPIRE");
 
         log.info("发送优惠券过期提醒: userId={}, title={}, content={}", userId, title, content);
     }

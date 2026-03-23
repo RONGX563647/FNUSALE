@@ -40,6 +40,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -83,6 +84,11 @@ public class SeckillServiceImpl implements SeckillService {
     private DefaultRedisScript<Long> warmUpAndDecrementScript;
 
     /**
+     * 检查并扣减库存脚本（包含用户购买检查）
+     */
+    private DefaultRedisScript<Long> checkAndDecrementScript;
+
+    /**
      * 商品信息本地缓存
      * 缓存秒杀商品信息，减少远程调用
      */
@@ -102,12 +108,66 @@ public class SeckillServiceImpl implements SeckillService {
         warmUpAndDecrementScript.setScriptText(SeckillLuaScript.WARM_UP_AND_DECREMENT_SCRIPT);
         warmUpAndDecrementScript.setResultType(Long.class);
 
+        checkAndDecrementScript = new DefaultRedisScript<>();
+        checkAndDecrementScript.setScriptText(SeckillLuaScript.CHECK_AND_DECREMENT_SCRIPT);
+        checkAndDecrementScript.setResultType(Long.class);
+
         // 初始化商品信息缓存
         productCache = Caffeine.newBuilder()
                 .maximumSize(1000)
                 .expireAfterWrite(Duration.ofMinutes(10))
                 .recordStats()
                 .build();
+
+        // 检查Redis连接并恢复数据
+        checkAndRecoverRedis();
+    }
+
+    /**
+     * 检查Redis连接并恢复数据
+     */
+    private void checkAndRecoverRedis() {
+        try {
+            redisTemplate.opsForValue().get("health_check");
+            log.info("Redis连接正常");
+        } catch (Exception e) {
+            log.error("Redis连接失败，尝试从数据库恢复数据", e);
+            recoverRedisData();
+        }
+    }
+
+    /**
+     * 从数据库恢复Redis数据
+     */
+    private void recoverRedisData() {
+        try {
+            List<SeckillActivity> activities = activityMapper.selectActiveActivities();
+            for (SeckillActivity activity : activities) {
+                try {
+                    String stockKey = MarketingConstants.SECKILL_STOCK_KEY_PREFIX + activity.getId();
+
+                    // 计算过期时间
+                    long expireSeconds = Duration.between(LocalDateTime.now(), activity.getEndTime()).getSeconds();
+                    if (expireSeconds <= 0) {
+                        expireSeconds = MarketingConstants.SECKILL_STOCK_PRELOAD_MINUTES * 60L;
+                    }
+
+                    // 恢复库存
+                    redisTemplate.opsForValue().set(
+                            stockKey,
+                            activity.getRemainStock().toString(),
+                            Duration.ofSeconds(expireSeconds)
+                    );
+
+                    log.info("Redis库存恢复成功: activityId={}, stock={}", activity.getId(), activity.getRemainStock());
+                } catch (Exception e) {
+                    log.error("恢复活动库存失败: activityId={}", activity.getId(), e);
+                }
+            }
+            log.info("Redis数据恢复完成，共恢复 {} 个活动", activities.size());
+        } catch (Exception e) {
+            log.error("Redis数据恢复失败", e);
+        }
     }
 
     @Override
@@ -181,7 +241,6 @@ public class SeckillServiceImpl implements SeckillService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public Long joinSeckill(Long userId, Long activityId) {
         SeckillActivity activity = activityMapper.selectById(activityId);
         if (activity == null) {
@@ -196,15 +255,10 @@ public class SeckillServiceImpl implements SeckillService {
             throw new BusinessException(5003, "秒杀活动已结束");
         }
 
-        // 检查用户是否已参与
-        String boughtKey = MarketingConstants.SECKILL_USER_BOUGHT_PREFIX + activityId;
-        Boolean hasBought = redisTemplate.opsForSet().isMember(boughtKey, userId.toString());
-        if (Boolean.TRUE.equals(hasBought)) {
-            throw new BusinessException(5005, "您已参与过该秒杀");
-        }
-
-        // Redis预扣库存 - 使用预热+扣减原子脚本
+        // 原子操作：检查用户是否已购买 + 扣减库存 + 标记用户已购买
+        // 使用 CHECK_AND_DECREMENT_SCRIPT 脚本，避免竞态条件
         String stockKey = MarketingConstants.SECKILL_STOCK_KEY_PREFIX + activityId;
+        String boughtKey = MarketingConstants.SECKILL_USER_BOUGHT_PREFIX + activityId;
 
         // 计算过期时间
         long expireSeconds = Duration.between(LocalDateTime.now(), activity.getEndTime()).getSeconds();
@@ -212,29 +266,27 @@ public class SeckillServiceImpl implements SeckillService {
             expireSeconds = MarketingConstants.SECKILL_STOCK_PRELOAD_MINUTES * 60L;
         }
 
-        // 使用 Lua 脚本原子预热并扣减库存
+        // 使用 Lua 脚本原子执行：检查用户 + 扣减库存 + 标记用户
         Long result = redisTemplate.execute(
-                warmUpAndDecrementScript,
-                Collections.singletonList(stockKey),
+                checkAndDecrementScript,
+                Arrays.asList(stockKey, boughtKey),
+                userId.toString(),
                 activity.getRemainStock().toString(),
                 String.valueOf(expireSeconds)
         );
 
-        // result: -1=参数错误, 0=库存不足, 正数=扣减成功返回剩余库存
+        // result: -2=用户已购买, -1=参数错误, 0=库存不足, 正数=扣减成功返回剩余库存
         if (result == null || result == -1) {
             log.error("秒杀库存扣减参数错误: activityId={}", activityId);
             throw new BusinessException(500, "系统繁忙，请稍后重试");
         }
 
-        if (result == 0) {
-            throw new BusinessException(5004, "秒杀库存不足");
+        if (result == -2) {
+            throw new BusinessException(5005, "您已参与过该秒杀");
         }
 
-        // 标记用户已购买
-        redisTemplate.opsForSet().add(boughtKey, userId.toString());
-        // 设置过期时间为活动结束时间
-        if (expireSeconds > 0) {
-            redisTemplate.expire(boughtKey, expireSeconds, TimeUnit.SECONDS);
+        if (result == 0) {
+            throw new BusinessException(5004, "秒杀库存不足");
         }
 
         // 生成事件ID
@@ -252,11 +304,45 @@ public class SeckillServiceImpl implements SeckillService {
                 .build();
 
         // ========== 本地消息表确保最终一致性 ==========
+        // 注意：本地消息表插入在事务内，MQ发送在事务外，确保事务边界正确
+        Long localMessageId = saveLocalMessageWithTransaction(orderEvent, eventId);
+
+        // ========== MQ发送（在事务外执行）==========
+        // 即使MQ发送失败，本地消息表已记录，定时任务会重试
         try {
-            // 1. 将消息内容序列化
+            boolean sent = eventPublisher.sendSync(
+                    RocketMQConstants.SECKILL_ORDER_TOPIC,
+                    RocketMQConstants.SECKILL_ORDER_TAG_CREATE,
+                    orderEvent
+            );
+
+            if (sent) {
+                localMessageMapper.updateToSent(localMessageId);
+                log.info("秒杀订单消息发送成功: eventId={}", eventId);
+            } else {
+                log.warn("秒杀订单消息发送失败，将由定时任务重试: eventId={}", eventId);
+            }
+        } catch (Exception e) {
+            log.error("秒杀订单MQ发送异常: userId={}, activityId={}, eventId={}", userId, activityId, eventId, e);
+            // 不抛出异常，因为Redis库存已扣减，本地消息已记录
+            // 定时任务会重试发送MQ消息
+        }
+
+        log.info("用户 {} 参与秒杀活动 {} 成功，订单创建中", userId, activityId);
+        return null;
+    }
+
+    /**
+     * 在独立事务中保存本地消息
+     * 确保本地消息的插入与Redis操作和MQ发送解耦
+     *
+     * @return 本地消息ID
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Long saveLocalMessageWithTransaction(SeckillOrderEvent orderEvent, String eventId) {
+        try {
             String messageContent = objectMapper.writeValueAsString(orderEvent);
 
-            // 2. 保存到本地消息表（同一事务内）
             LocalMessage localMessage = LocalMessage.builder()
                     .messageId(eventId)
                     .messageType(LocalMessageStatus.MessageType.SECKILL_ORDER)
@@ -270,31 +356,13 @@ public class SeckillServiceImpl implements SeckillService {
                     .createTime(LocalDateTime.now())
                     .updateTime(LocalDateTime.now())
                     .build();
+
             localMessageMapper.insert(localMessage);
-
-            // 3. 尝试发送MQ消息（如果失败，定时任务会重试）
-            boolean sent = eventPublisher.sendSync(
-                    RocketMQConstants.SECKILL_ORDER_TOPIC,
-                    RocketMQConstants.SECKILL_ORDER_TAG_CREATE,
-                    orderEvent
-            );
-
-            if (sent) {
-                // 发送成功，更新消息状态
-                localMessageMapper.updateToSent(localMessage.getId());
-                log.info("秒杀订单消息发送成功: eventId={}", eventId);
-            } else {
-                // 发送失败，消息保持PENDING状态，由定时任务重试
-                log.warn("秒杀订单消息发送失败，将由定时任务重试: eventId={}", eventId);
-            }
+            return localMessage.getId();
         } catch (Exception e) {
-            log.error("秒杀订单处理异常: userId={}, activityId={}", userId, activityId, e);
-            // 注意：此处不抛出异常，因为Redis库存已扣减，用户已获得秒杀资格
-            // 消息将由定时任务重试发送
+            log.error("保存本地消息失败: eventId={}", eventId, e);
+            throw new RuntimeException("保存本地消息失败", e);
         }
-
-        log.info("用户 {} 参与秒杀活动 {} 成功，订单创建中", userId, activityId);
-        return null; // 订单正在创建中，用户可轮询查询结果
     }
 
     @Override
@@ -581,8 +649,26 @@ public class SeckillServiceImpl implements SeckillService {
         List<SeckillActivity> activities = activityMapper.selectStartingSoon();
         for (SeckillActivity activity : activities) {
             String stockKey = MarketingConstants.SECKILL_STOCK_KEY_PREFIX + activity.getId();
-            redisTemplate.opsForValue().set(stockKey, activity.getRemainStock().toString());
-            log.info("预热秒杀活动 {} 库存: {}", activity.getId(), activity.getRemainStock());
+
+            // 计算过期时间
+            long expireSeconds = Duration.between(LocalDateTime.now(), activity.getEndTime()).getSeconds();
+            if (expireSeconds <= 0) {
+                expireSeconds = MarketingConstants.SECKILL_STOCK_PRELOAD_MINUTES * 60L;
+            }
+
+            // 使用 Lua 脚本原子预热（避免并发重复预热）
+            Long result = redisTemplate.execute(
+                    warmUpStockScript,
+                    Collections.singletonList(stockKey),
+                    activity.getRemainStock().toString(),
+                    String.valueOf(expireSeconds)
+            );
+
+            if (result != null && result == 1) {
+                log.info("预热秒杀活动 {} 库存: {}", activity.getId(), activity.getRemainStock());
+            } else {
+                log.debug("秒杀活动 {} 库存已存在，跳过预热", activity.getId());
+            }
         }
     }
 

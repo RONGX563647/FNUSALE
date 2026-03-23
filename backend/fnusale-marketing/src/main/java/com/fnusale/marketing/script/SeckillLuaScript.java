@@ -35,11 +35,12 @@ public class SeckillLuaScript {
      * KEYS[2]: 用户已购买集合key
      * ARGV[1]: 用户ID
      * ARGV[2]: 库存值（用于预热）
+     * ARGV[3]: 过期时间（秒）
      * 返回值说明：
      * -2: 用户已购买
      * -1: 库存未预热
      *  0: 库存不足
-     *  1: 扣减成功
+     * 正数: 扣减成功，返回剩余库存数
      */
     public static final String CHECK_AND_DECREMENT_SCRIPT = """
             -- 检查用户是否已购买
@@ -50,7 +51,16 @@ public class SeckillLuaScript {
             -- 检查库存
             local stock = redis.call('GET', KEYS[1])
             if stock == false then
-                return -1
+                -- 库存未预热，使用传入的值初始化
+                if ARGV[2] and tonumber(ARGV[2]) > 0 then
+                    redis.call('SET', KEYS[1], ARGV[2])
+                    if ARGV[3] and tonumber(ARGV[3]) > 0 then
+                        redis.call('EXPIRE', KEYS[1], ARGV[3])
+                    end
+                    stock = ARGV[2]
+                else
+                    return -1
+                end
             end
 
             local remain = tonumber(stock)
@@ -61,7 +71,7 @@ public class SeckillLuaScript {
             -- 扣减库存并标记用户已购买
             redis.call('DECR', KEYS[1])
             redis.call('SADD', KEYS[2], ARGV[1])
-            return 1
+            return remain - 1
             """;
 
     /**

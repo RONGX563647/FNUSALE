@@ -33,4 +33,9 @@ public class EmailLog {
     private LocalDateTime sendTime;
 
     private Integer retryCount;
+
+    /**
+     * 创建时间
+     */
+    private LocalDateTime createTime;
 }
