@@ -71,6 +71,12 @@
                 </exclusion>
             </exclusions>
         </dependency>
+
+        <!-- Kafka for Log -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

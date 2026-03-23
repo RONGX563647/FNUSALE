@@ -36,11 +36,33 @@ public class SeckillResultVO implements Serializable {
     @Schema(description = "时间戳")
     private Long timestamp;
 
+    @Schema(description = "排队号（秒杀成功时返回，用于查询结果）")
+    private Long queueNumber;
+
+    @Schema(description = "活动ID")
+    private Long activityId;
+
     public static SeckillResultVO success(Long orderId) {
         return SeckillResultVO.builder()
                 .success(true)
                 .orderId(orderId)
                 .message("秒杀成功")
+                .timestamp(System.currentTimeMillis())
+                .build();
+    }
+
+    /**
+     * 秒杀成功（异步创建订单）
+     * @param queueNumber 排队号
+     * @param activityId 活动ID
+     * @return 秒杀结果
+     */
+    public static SeckillResultVO pending(Long queueNumber, Long activityId) {
+        return SeckillResultVO.builder()
+                .success(true)
+                .queueNumber(queueNumber)
+                .activityId(activityId)
+                .message("秒杀成功，订单创建中")
                 .timestamp(System.currentTimeMillis())
                 .build();
     }

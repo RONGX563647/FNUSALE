@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
 import org.apache.rocketmq.spring.core.RocketMQListener;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +25,7 @@ import java.util.concurrent.TimeUnit;
         selectorExpression = RocketMQConstants.USER_REGISTER_TAG_WELCOME
 )
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "rocketmq.name-server")
 public class UserRegisterWelcomeConsumer implements RocketMQListener<UserRegisterEvent> {
 
     private final StringRedisTemplate redisTemplate;

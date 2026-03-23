@@ -45,23 +45,45 @@ spring:
     username: ${MYSQL_USER:fnusale}
     password: ${MYSQL_PASSWORD:fnusale123456}
     hikari:
-      maximum-pool-size: 20
-      minimum-idle: 5
+      maximum-pool-size: 50
+      minimum-idle: 20
       idle-timeout: 300000
-      connection-timeout: 30000
+      connection-timeout: 5000
+      max-lifetime: 1200000
+      leak-detection-threshold: 60000
       pool-name: FnusaleMarketingHikariPool
+      connection-test-query: SELECT 1
+      validation-timeout: 3000
   data:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:redis123456}
       database: 0
+      timeout: 3000ms
       lettuce:
         pool:
-          max-active: 16
-          max-idle: 8
-          min-idle: 2
-          max-wait: 3000ms
+          max-active: 64
+          max-idle: 32
+          min-idle: 16
+          max-wait: 5000ms
+          time-between-eviction-runs: 60000ms
+        shutdown-timeout: 200ms
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      retries: 3
+      compression-type: lz4
+      batch-size: 16384
+      buffer-memory: 33554432
+      linger-ms: 5
+    consumer:
+      group-id: fnusale-marketing
+      auto-offset-reset: earliest
+      enable-auto-commit: false
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
@@ -75,7 +97,6 @@ mybatis-plus:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
 
-# Knife4j 配置
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
@@ -95,7 +116,6 @@ logging:
   level:
     com.fnusale: info
 
-# RocketMQ 配置
 rocketmq:
   name-server: ${ROCKETMQ_NAME_SERVER:localhost:9876}
   producer:
@@ -104,7 +124,11 @@ rocketmq:
     retry-times-when-send-failed: 2
     retry-times-when-send-async-failed: 2
 
-# Sentinel 限流配置
+kafka:
+  log:
+    topic: fnusale-logs
+    enabled: ${KAFKA_LOG_ENABLED:true}
+
 management:
   endpoints:
     web:
@@ -123,3 +147,15 @@ management:
       export:
         enabled: true
         descriptions: true
+
+seckill:
+  anti-fraud:
+    ip-limit:
+      threshold: 10
+      window-seconds: 60
+    captcha:
+      fail-threshold: 3
+      expire-minutes: 5
+      length: 4
+    user-fail:
+      expire-hours: 1

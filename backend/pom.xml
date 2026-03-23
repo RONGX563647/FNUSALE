@@ -60,7 +60,10 @@
         <logstash-logback-encoder.version>7.4</logstash-logback-encoder.version>
 
         <!-- RocketMQ -->
-        <rocketmq.version>2.2.3</rocketmq.version>
+        <rocketmq.version>2.3.0</rocketmq.version>
+
+        <!-- Kafka -->
+        <spring-kafka.version>3.1.0</spring-kafka.version>
 
         <!-- Plugin versions -->
         <maven-compiler-plugin.version>3.12.1</maven-compiler-plugin.version>
@@ -130,6 +133,13 @@
                 <groupId>org.apache.rocketmq</groupId>
                 <artifactId>rocketmq-spring-boot-starter</artifactId>
                 <version>${rocketmq.version}</version>
+            </dependency>
+
+            <!-- Kafka -->
+            <dependency>
+                <groupId>org.springframework.kafka</groupId>
+                <artifactId>spring-kafka</artifactId>
+                <version>${spring-kafka.version}</version>
             </dependency>
 
             <!-- Tools -->

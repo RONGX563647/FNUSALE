@@ -1,0 +1,117 @@
+# 校园二手交易平台 - 微服务部署配置
+# 用于在服务器上部署应用服务
+
+services:
+  # API 网关
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: fnusale-gateway
+        SERVICE_PORT: 8080
+    container_name: fnusale-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - JAVA_OPTS=-Xms256m -Xmx512m -XX:+UseG1GC
+      - SPRING_PROFILES_ACTIVE=prod
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - REDIS_HOST=redis
+      - NACOS_HOST=nacos
+      - NACOS_PORT=8848
+    depends_on:
+      nacos:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - fnusale-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 营销服务（秒杀核心）
+  marketing:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: fnusale-marketing
+        SERVICE_PORT: 8105
+    container_name: fnusale-marketing
+    restart: unless-stopped
+    ports:
+      - "8105:8105"
+    environment:
+      - JAVA_OPTS=-Xms512m -Xmx1g -XX:+UseG1GC
+      - SPRING_PROFILES_ACTIVE=prod
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - REDIS_HOST=redis
+      - NACOS_HOST=nacos
+      - NACOS_PORT=8848
+      - ROCKETMQ_NAME_SERVER=rocketmq-nameserver:9876
+      - SENTINEL_DASHBOARD=sentinel:8858
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+      rocketmq-nameserver:
+        condition: service_started
+    networks:
+      - fnusale-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8105/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 交易服务
+  trade:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: fnusale-trade
+        SERVICE_PORT: 8106
+    container_name: fnusale-trade
+    restart: unless-stopped
+    ports:
+      - "8106:8106"
+    environment:
+      - JAVA_OPTS=-Xms512m -Xmx1g -XX:+UseG1GC
+      - SPRING_PROFILES_ACTIVE=prod
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - REDIS_HOST=redis
+      - NACOS_HOST=nacos
+      - NACOS_PORT=8848
+      - ROCKETMQ_NAME_SERVER=rocketmq-nameserver:9876
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+      rocketmq-nameserver:
+        condition: service_started
+    networks:
+      - fnusale-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8106/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  fnusale-network:
+    external: true

@@ -1,0 +1,155 @@
+# 秒杀服务 Prometheus 告警规则
+# 文件位置: prometheus/rules/seckill_alerts.yml
+
+groups:
+  - name: seckill_alerts
+    rules:
+      # ==================== 库存告警 ====================
+
+      # 库存耗尽告警
+      - alert: SeckillStockExhausted
+        expr: seckill_stock_remaining == 0
+        for: 1m
+        labels:
+          severity: warning
+          service: fnusale-marketing
+        annotations:
+          summary: "秒杀库存已耗尽"
+          description: "活动 {{ $labels.activity_id }} 库存已耗尽，请关注活动状态"
+
+      # 库存低于阈值告警
+      - alert: SeckillStockLow
+        expr: seckill_stock_remaining > 0 and seckill_stock_remaining < 5
+        for: 30s
+        labels:
+          severity: info
+          service: fnusale-marketing
+        annotations:
+          summary: "秒杀库存即将耗尽"
+          description: "活动 {{ $labels.activity_id }} 剩余库存 {{ $value }} 件"
+
+      # ==================== 性能告警 ====================
+
+      # 秒杀接口响应时间告警
+      - alert: SeckillResponseTimeHigh
+        expr: histogram_quantile(0.95, rate(http_server_requests_seconds_bucket{uri=~"/api/marketing/seckill/.*"}[5m])) > 0.5
+        for: 2m
+        labels:
+          severity: warning
+          service: fnusale-marketing
+        annotations:
+          summary: "秒杀接口响应时间过长"
+          description: "秒杀接口P95响应时间 {{ $value | humanizeDuration }}，超过500ms阈值"
+
+      # 秒杀接口错误率告警
+      - alert: SeckillErrorRateHigh
+        expr: |
+          sum(rate(http_server_requests_seconds_count{uri=~"/api/marketing/seckill/.*", status=~"5.."}[5m]))
+          /
+          sum(rate(http_server_requests_seconds_count{uri=~"/api/marketing/seckill/.*"}[5m])) > 0.05
+        for: 1m
+        labels:
+          severity: critical
+          service: fnusale-marketing
+        annotations:
+          summary: "秒杀接口错误率过高"
+          description: "秒杀接口5xx错误率 {{ $value | humanizePercentage }}，超过5%阈值"
+
+      # ==================== 并发告警 ====================
+
+      # 秒杀QPS过高告警
+      - alert: SeckillQPSTooHigh
+        expr: sum(rate(http_server_requests_seconds_count{uri=~"/api/marketing/seckill/.*/join"}[1m])) > 500
+        for: 30s
+        labels:
+          severity: warning
+          service: fnusale-marketing
+        annotations:
+          summary: "秒杀QPS超过阈值"
+          description: "秒杀接口QPS {{ $value }}，超过500阈值，可能需要限流"
+
+      # ==================== 业务告警 ====================
+
+      # Redis回滚次数告警
+      - alert: SeckillRollbackTooMany
+        expr: increase(seckill_rollback_total[5m]) > 10
+        for: 1m
+        labels:
+          severity: warning
+          service: fnusale-marketing
+        annotations:
+          summary: "秒杀Redis回滚次数过多"
+          description: "5分钟内Redis回滚 {{ $value }} 次，可能存在数据库或MQ问题"
+
+      # 秒杀成功率告警
+      - alert: SeckillSuccessRateLow
+        expr: |
+          sum(rate(seckill_success_total[10m]))
+          /
+          sum(rate(seckill_attempt_total[10m])) < 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: fnusale-marketing
+        annotations:
+          summary: "秒杀成功率过低"
+          description: "秒杀成功率 {{ $value | humanizePercentage }}，低于50%，请检查库存或系统状态"
+
+      # 订单创建失败告警
+      - alert: SeckillOrderCreateFailed
+        expr: increase(seckill_order_create_failed_total[5m]) > 5
+        for: 1m
+        labels:
+          severity: critical
+          service: fnusale-trade
+        annotations:
+          summary: "秒杀订单创建失败次数过多"
+          description: "5分钟内订单创建失败 {{ $value }} 次，请检查订单服务状态"
+
+      # ==================== 资源告警 ====================
+
+      # JVM内存使用率告警
+      - alert: SeckillJVMMemoryHigh
+        expr: jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"} > 0.85
+        for: 3m
+        labels:
+          severity: warning
+          service: fnusale-marketing
+        annotations:
+          summary: "秒杀服务JVM堆内存使用率过高"
+          description: "JVM堆内存使用率 {{ $value | humanizePercentage }}，超过85%阈值"
+
+      # Redis连接池告警
+      - alert: SeckillRedisConnectionPoolLow
+        expr: redis_connection_pool_available < 5
+        for: 1m
+        labels:
+          severity: warning
+          service: fnusale-marketing
+        annotations:
+          summary: "Redis连接池可用连接数过低"
+          description: "Redis连接池可用连接数 {{ $value }}，低于5个"
+
+      # ==================== 活动状态告警 ====================
+
+      # 活动未预热告警
+      - alert: SeckillActivityNotWarmedUp
+        expr: seckill_activity_status{status="NOT_START"} == 1 and time() - seckill_activity_start_timestamp < 300 and seckill_redis_stock_exists == 0
+        for: 1m
+        labels:
+          severity: warning
+          service: fnusale-marketing
+        annotations:
+          summary: "秒杀活动即将开始但未预热"
+          description: "活动 {{ $labels.activity_id }} 5分钟内开始但Redis库存未预热"
+
+      # 活动结束后Redis未清理告警
+      - alert: SeckillActivityRedisNotCleaned
+        expr: seckill_activity_status{status="END"} == 1 and seckill_redis_stock_exists == 1
+        for: 10m
+        labels:
+          severity: info
+          service: fnusale-marketing
+        annotations:
+          summary: "活动结束后Redis数据未清理"
+          description: "活动 {{ $labels.activity_id }} 已结束10分钟，但Redis数据未清理"

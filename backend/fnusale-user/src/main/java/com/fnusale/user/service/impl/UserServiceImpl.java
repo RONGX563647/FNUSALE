@@ -1,6 +1,5 @@
 package com.fnusale.user.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fnusale.common.config.CampusFenceConfig;
 import com.fnusale.common.constant.RedisKeyConstants;
 import com.fnusale.common.constant.UserConstants;
@@ -41,11 +40,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function Runnable;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -66,9 +65,6 @@ public class UserServiceImpl implements UserService {
     private static final long LOCK_WAIT_TIME = 0;
     private static final long LOCK_LEASE_TIME = 30;
 
-    public static void setCurrentUserId(long l) {
-    }
-
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void registerByPhone(UserRegisterDTO dto) {
@@ -76,44 +72,21 @@ public class UserServiceImpl implements UserService {
         UserValidator.validateUsername(dto.getUsername());
         UserValidator.validatePassword(dto.getPassword());
 
-        String lockKey = RedisKeyConstants.buildRegisterLockKey(dto.getPhone());
-        RLock lock = redissonClient.getLock(lockKey);
-
-        try {
-            boolean locked = lock.tryLock(LOCK_WAIT_TIME, LOCK_LEASE_TIME, TimeUnit.SECONDS);
-            if (!locked) {
-                throw new BusinessException("请勿重复提交注册请求");
-            }
-
-            try {
+        executeWithLock(
+            RedisKeyConstants.buildRegisterLockKey(dto.getPhone()),
+            "请勿重复提交注册请求",
+            () -> {
                 if (userMapper.countByPhone(dto.getPhone()) > 0) {
                     throw new BusinessException("该手机号已被注册");
                 }
-
-                User user = User.builder()
-                        .username(dto.getUsername())
-                        .phone(dto.getPhone())
-                        .password(passwordEncoder.encode(dto.getPassword()))
-                        .identityType(dto.getIdentityType() != null ? dto.getIdentityType() : UserConstants.IDENTITY_TYPE_STUDENT)
-                        .authStatus(AuthStatus.UNAUTH.getCode())
-                        .creditScore(UserConstants.DEFAULT_CREDIT_SCORE)
-                        .locationPermission(UserConstants.LOCATION_PERMISSION_DENY)
-                        .build();
-
+                User user = buildUserForRegistration(dto);
+                user.setPhone(dto.getPhone());
                 userMapper.insert(user);
                 initUserPoints(user.getId());
                 publishRegisterEvent(user, "PHONE");
-
                 log.info("用户注册成功，userId: {}, phone: {}", user.getId(), DesensitizeUtil.phone(dto.getPhone()));
-            } finally {
-                if (lock.isHeldByCurrentThread()) {
-                    lock.unlock();
-                }
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new BusinessException("注册请求被中断，请重试");
-        }
+        );
     }
 
     @Override
@@ -123,44 +96,21 @@ public class UserServiceImpl implements UserService {
         UserValidator.validateUsername(dto.getUsername());
         UserValidator.validatePassword(dto.getPassword());
 
-        String lockKey = RedisKeyConstants.buildRegisterLockKey(dto.getEmail());
-        RLock lock = redissonClient.getLock(lockKey);
-
-        try {
-            boolean locked = lock.tryLock(LOCK_WAIT_TIME, LOCK_LEASE_TIME, TimeUnit.SECONDS);
-            if (!locked) {
-                throw new BusinessException("请勿重复提交注册请求");
-            }
-
-            try {
+        executeWithLock(
+            RedisKeyConstants.buildRegisterLockKey(dto.getEmail()),
+            "请勿重复提交注册请求",
+            () -> {
                 if (userMapper.countByEmail(dto.getEmail()) > 0) {
                     throw new BusinessException("该邮箱已被注册");
                 }
-
-                User user = User.builder()
-                        .username(dto.getUsername())
-                        .campusEmail(dto.getEmail())
-                        .password(passwordEncoder.encode(dto.getPassword()))
-                        .identityType(dto.getIdentityType() != null ? dto.getIdentityType() : UserConstants.IDENTITY_TYPE_STUDENT)
-                        .authStatus(AuthStatus.UNAUTH.getCode())
-                        .creditScore(UserConstants.DEFAULT_CREDIT_SCORE)
-                        .locationPermission(UserConstants.LOCATION_PERMISSION_DENY)
-                        .build();
-
+                User user = buildUserForRegistration(dto);
+                user.setCampusEmail(dto.getEmail());
                 userMapper.insert(user);
                 initUserPoints(user.getId());
                 publishRegisterEvent(user, "EMAIL");
-
                 log.info("用户注册成功，userId: {}, email: {}", user.getId(), DesensitizeUtil.email(dto.getEmail()));
-            } finally {
-                if (lock.isHeldByCurrentThread()) {
-                    lock.unlock();
-                }
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new BusinessException("注册请求被中断，请重试");
-        }
+        );
     }
 
     @Override
@@ -582,5 +532,42 @@ public class UserServiceImpl implements UserService {
     @CacheEvict(value = "userInfo", key = "#userId")
     public void evictUserCache(Long userId) {
         log.debug("清除用户缓存，userId: {}", userId);
+    }
+
+    /**
+     * 分布式锁执行模板
+     */
+    private void executeWithLock(String lockKey, String lockFailMessage, Runnable task) {
+        RLock lock = redissonClient.getLock(lockKey);
+        try {
+            boolean locked = lock.tryLock(LOCK_WAIT_TIME, LOCK_LEASE_TIME, TimeUnit.SECONDS);
+            if (!locked) {
+                throw new BusinessException(lockFailMessage);
+            }
+            try {
+                task.run();
+            } finally {
+                if (lock.isHeldByCurrentThread()) {
+                    lock.unlock();
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new BusinessException("请求被中断，请重试");
+        }
+    }
+
+    /**
+     * 构建注册用户实体（公共逻辑）
+     */
+    private User buildUserForRegistration(UserRegisterDTO dto) {
+        return User.builder()
+                .username(dto.getUsername())
+                .password(passwordEncoder.encode(dto.getPassword()))
+                .identityType(dto.getIdentityType() != null ? dto.getIdentityType() : UserConstants.IDENTITY_TYPE_STUDENT)
+                .authStatus(AuthStatus.UNAUTH.getCode())
+                .creditScore(UserConstants.DEFAULT_CREDIT_SCORE)
+                .locationPermission(UserConstants.LOCATION_PERMISSION_DENY)
+                .build();
     }
 }

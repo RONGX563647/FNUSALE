@@ -7,6 +7,7 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -19,12 +20,17 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class EmailServiceImpl implements EmailService {
-    
-    private final JavaMailSender mailSender;
+
+    private JavaMailSender mailSender;
     private final EmailLogService emailLogService;
-    
-    @Value("${spring.mail.username}")
+
+    @Value("${spring.mail.username:}")
     private String fromEmail;
+
+    @Autowired(required = false)
+    public void setMailSender(JavaMailSender mailSender) {
+        this.mailSender = mailSender;
+    }
     
     @Value("${spring.mail.send.retry.max:3}")
     private int maxRetryAttempts;
@@ -34,9 +40,14 @@ public class EmailServiceImpl implements EmailService {
     
     @Override
     public void sendVerificationCode(String to, String captcha) {
+        if (mailSender == null) {
+            log.warn("JavaMailSender未配置，跳过验证码邮件发送, 收件人: {}", to);
+            return;
+        }
+
         int retryCount = 0;
         String errorMessage = null;
-        
+
         while (retryCount < maxRetryAttempts) {
             try {
                 MimeMessage message = mailSender.createMimeMessage();
@@ -98,9 +109,14 @@ public class EmailServiceImpl implements EmailService {
     
     @Override
     public void sendWelcomeEmail(String to, String username) {
+        if (mailSender == null) {
+            log.warn("JavaMailSender未配置，跳过欢迎邮件发送, 收件人: {}", to);
+            return;
+        }
+
         int retryCount = 0;
         String errorMessage = null;
-        
+
         while (retryCount < maxRetryAttempts) {
             try {
                 MimeMessage message = mailSender.createMimeMessage();

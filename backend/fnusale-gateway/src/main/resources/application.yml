@@ -101,6 +101,26 @@ spring:
           max-idle: 8
           min-idle: 2
           max-wait: 3000ms
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      retries: 3
+      batch-size: 16384
+      buffer-memory: 33554432
+    consumer:
+      group-id: fnusale-gateway
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+kafka:
+  log:
+    topic: fnusale-logs
+    enabled: ${KAFKA_LOG_ENABLED:true}
 
 # Knife4j 网关配置
 knife4j:

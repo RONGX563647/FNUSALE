@@ -3,11 +3,11 @@ package com.fnusale.user.service.impl;
 import com.fnusale.common.constant.RocketMQConstants;
 import com.fnusale.common.event.UserRegisterEvent;
 import com.fnusale.user.service.UserRegisterEventPublisher;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.client.producer.SendCallback;
 import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
@@ -15,14 +15,23 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection")
 public class UserRegisterEventPublisherImpl implements UserRegisterEventPublisher {
 
-    private final RocketMQTemplate rocketMQTemplate;
+    private RocketMQTemplate rocketMQTemplate;
+
+    @Autowired(required = false)
+    public void setRocketMQTemplate(RocketMQTemplate rocketMQTemplate) {
+        this.rocketMQTemplate = rocketMQTemplate;
+    }
 
     @Override
     public void publishRegisterEvent(UserRegisterEvent event) {
+        if (rocketMQTemplate == null) {
+            log.warn("RocketMQTemplate未配置，跳过用户注册事件发布, userId: {}", event.getUserId());
+            return;
+        }
+
         // 发送初始化积分消息
         sendAsyncMessage(
                 RocketMQConstants.USER_REGISTER_TOPIC + ":" + RocketMQConstants.USER_REGISTER_TAG_INIT_POINTS,

@@ -14,6 +14,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -61,10 +62,11 @@ class SeckillWarmUpConsumerTest {
 
             consumer.onMessage(testEvent);
 
-            // 验证库存设置
+            // 验证库存设置（带过期时间）
             verify(valueOperations).set(
                 eq(MarketingConstants.SECKILL_STOCK_KEY_PREFIX + "100"),
-                eq("50")
+                eq("50"),
+                any(Duration.class)
             );
             // 验证清理已购买用户集合
             verify(redisTemplate).delete(

@@ -51,4 +51,10 @@ public interface LocalMessageMapper extends BaseMapper<LocalMessage> {
      */
     @Update("DELETE FROM t_local_message WHERE status = 'SENT' AND create_time < #{beforeTime}")
     int cleanOldMessages(@Param("beforeTime") LocalDateTime beforeTime);
+    
+    /**
+     * 重置消息状态为待重试（消费者处理失败时调用）
+     */
+    @Update("UPDATE t_local_message SET status = 'PENDING', retry_count = retry_count + 1, next_retry_time = NOW(), update_time = NOW() WHERE message_id = #{messageId}")
+    int resetToPending(@Param("messageId") String messageId);
 }

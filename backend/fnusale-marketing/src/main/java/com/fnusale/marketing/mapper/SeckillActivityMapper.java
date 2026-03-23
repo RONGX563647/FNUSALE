@@ -80,4 +80,17 @@ public interface SeckillActivityMapper extends BaseMapper<SeckillActivity> {
      */
     @Select("SELECT * FROM t_seckill_activity WHERE DATE(start_time) = CURDATE() AND DATE_FORMAT(start_time, '%H:%i') = #{timeSlot} ORDER BY start_time ASC")
     List<SeckillActivity> selectByTimeSlot(@Param("timeSlot") String timeSlot);
+
+    /**
+     * 查询即将结束的活动（用于清理Redis）
+     * 查询状态为进行中且结束时间已过的活动
+     */
+    @Select("SELECT * FROM t_seckill_activity WHERE activity_status = 'ON_GOING' AND end_time <= NOW()")
+    List<SeckillActivity> selectEndedActivities();
+    
+    /**
+     * 查询进行中的活动（用于监控告警）
+     */
+    @Select("SELECT * FROM t_seckill_activity WHERE activity_status = 'ON_GOING'")
+    List<SeckillActivity> selectOngoingActivities();
 }

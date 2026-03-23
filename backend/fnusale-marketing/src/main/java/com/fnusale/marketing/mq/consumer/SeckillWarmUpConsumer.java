@@ -12,11 +12,14 @@ import org.apache.rocketmq.spring.core.RocketMQListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 /**
  * 秒杀预热消费者
  * 消费秒杀预热消息，将库存预热到 Redis
+ *
+ * v4优化：使用SET EX原子操作
  */
 @Slf4j
 @Component
@@ -53,14 +56,13 @@ public class SeckillWarmUpConsumer implements RocketMQListener<SeckillWarmUpEven
         }
 
         try {
+            // 预热库存到 Redis（v4优化：使用SET EX原子操作）
             String stockKey = MarketingConstants.SECKILL_STOCK_KEY_PREFIX + activityId;
-            redisTemplate.opsForValue().set(stockKey, event.getStock().toString());
+            long ttlSeconds = 7200;
+            redisTemplate.opsForValue().set(stockKey, event.getStock().toString(), Duration.ofSeconds(ttlSeconds));
 
             String boughtKey = MarketingConstants.SECKILL_USER_BOUGHT_PREFIX + activityId;
             redisTemplate.delete(boughtKey);
-
-            long ttlSeconds = 7200;
-            redisTemplate.expire(stockKey, ttlSeconds, TimeUnit.SECONDS);
 
             log.info("秒杀预热完成, activityId: {}, stock: {}", activityId, event.getStock());
         } catch (Exception e) {

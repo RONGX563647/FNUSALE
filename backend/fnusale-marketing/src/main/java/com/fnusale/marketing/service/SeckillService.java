@@ -38,13 +38,34 @@ public interface SeckillService {
     Object getSeckillProductDetail(Long productId);
 
     /**
-     * 参与秒杀
+     * 参与秒杀（带防刷检查）
      *
      * @param userId     用户ID
      * @param activityId 活动ID
-     * @return 订单ID
+     * @param ip         用户IP
+     * @param captchaKey  验证码key（可选）
+     * @param captchaCode 验证码（可选）
+     * @return 排队号（用于查询秒杀结果）
      */
-    Long joinSeckill(Long userId, Long activityId);
+    Long joinSeckill(Long userId, Long activityId, String ip, String captchaKey, String captchaCode);
+    
+    /**
+     * 检查用户是否需要验证码
+     *
+     * @param userId     用户ID
+     * @param activityId 活动ID
+     * @return true=需要验证码
+     */
+    boolean needCaptcha(Long userId, Long activityId);
+    
+    /**
+     * 生成验证码
+     *
+     * @param userId     用户ID
+     * @param activityId 活动ID
+     * @return 验证码key
+     */
+    String generateCaptcha(Long userId, Long activityId);
 
     /**
      * 获取秒杀结果

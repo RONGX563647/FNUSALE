@@ -10,12 +10,17 @@
 |------|------|------|------|
 | MySQL | 8.0 | 主数据库 | 3306 |
 | Redis | 7.0 | 缓存/秒杀库存/IM会话 | 6379 |
-| Elasticsearch | 8.0 | 商品搜索 | 9200 |
+| Elasticsearch | 8.0 | 商品搜索/日志存储 | 9200 |
 | MinIO | latest | 对象存储 | 9000/9001 |
 | Nacos | 2.2.3 | 注册/配置中心 | 8848 |
 | Sentinel | 1.8.6 | 限流/熔断控制台 | 8858 |
-| RocketMQ | 5.1.0 | 消息队列 | 9876/10911 |
+| RocketMQ | 5.1.0 | 业务消息队列 | 9876/10911 |
 | RocketMQ Dashboard | latest | 消息队列管理 | 8180 |
+| Zookeeper | 7.4.0 | Kafka协调服务 | 2181 |
+| Kafka | 7.4.0 | 日志收集消息队列 | 9092 |
+| Kafka UI | latest | Kafka管理界面 | 9000 |
+| Logstash | 8.0.0 | 日志收集处理 | 4560/5044 |
+| Kibana | 8.0.0 | 日志可视化 | 5601 |
 | Prometheus | latest | 监控数据采集 | 9090 |
 | Grafana | latest | 监控可视化 | 3000 |
 
@@ -95,6 +100,14 @@ docker-compose down -v
 - **RocketMQ NameServer**: `localhost:9876`
 - **RocketMQ Broker**: `localhost:10911`
 - **RocketMQ Dashboard**: `http://localhost:8180`
+- **Zookeeper**: `localhost:2181`
+- **Kafka**: `localhost:9092`
+- **Kafka UI**: `http://localhost:9000`
+
+### 日志收集
+- **Logstash**: `localhost:4560` (TCP), `localhost:5044` (Beats)
+- **Kibana**: `http://localhost:5601`
+  - 中文界面，用于日志搜索和分析
 
 ### 监控层
 - **Prometheus**: `http://localhost:9090`
@@ -244,6 +257,14 @@ docker/
 ```
 
 ## 更新日志
+
+### 2026-03-22
+- 新增Kafka日志收集系统
+  - 添加Zookeeper、Kafka、Kafka UI服务
+  - 配置Logstash从Kafka消费日志
+  - 实现TraceId链路追踪
+  - 集成ELK日志收集架构
+- 更新技术栈文档
 
 ### 2026-03-19
 - 删除冗余的RabbitMQ配置

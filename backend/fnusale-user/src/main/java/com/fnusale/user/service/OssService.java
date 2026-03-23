@@ -3,8 +3,8 @@ package com.fnusale.user.service;
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.model.PutObjectRequest;
 import com.fnusale.user.config.OssConfig;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -19,11 +19,10 @@ import java.util.UUID;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class OssService {
 
-    private final OSS ossClient;
-    private final OssConfig ossConfig;
+    private OSS ossClient;
+    private OssConfig ossConfig;
 
     private static final List<String> ALLOWED_IMAGE_TYPES = Arrays.asList(
             "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"
@@ -32,16 +31,34 @@ public class OssService {
     private static final long MAX_AVATAR_SIZE = 2 * 1024 * 1024; // 2MB
     private static final long MAX_AUTH_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 
+    @Autowired(required = false)
+    public void setOssClient(OSS ossClient) {
+        this.ossClient = ossClient;
+    }
+
+    @Autowired(required = false)
+    public void setOssConfig(OssConfig ossConfig) {
+        this.ossConfig = ossConfig;
+    }
+
     public String uploadAvatar(MultipartFile file, Long userId) {
+        validateOssConfig();
         validateImageFile(file, MAX_AVATAR_SIZE);
         String dir = generateDir("avatar", userId);
         return uploadFile(file, dir);
     }
 
     public String uploadAuthImage(MultipartFile file, Long userId) {
+        validateOssConfig();
         validateImageFile(file, MAX_AUTH_IMAGE_SIZE);
         String dir = generateDir("auth", userId);
         return uploadFile(file, dir);
+    }
+
+    private void validateOssConfig() {
+        if (ossClient == null || ossConfig == null) {
+            throw new RuntimeException("OSS服务未配置，请联系管理员");
+        }
     }
 
     public String uploadFile(MultipartFile file, String dir) {

@@ -2,14 +2,17 @@ package com.fnusale.marketing.client;
 
 import com.fnusale.common.common.Result;
 import com.fnusale.common.vo.product.ProductVO;
+import com.fnusale.marketing.client.fallback.ProductClientFallbackFactory;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
 /**
  * 商品服务 Feign 客户端
+ * 配置降级处理，提高服务容错性
  */
-@FeignClient(name = "fnusale-product", path = "/product")
+@FeignClient(name = "fnusale-product", path = "/product", 
+             fallbackFactory = ProductClientFallbackFactory.class)
 public interface ProductClient {
 
     /**

@@ -1,6 +1,6 @@
 # 校园二手交易平台 - 基础设施 Docker Compose 配置
 # 适用于开发环境，单节点部署
-# 技术栈：MySQL 8.0 + Redis 7.0 + Elasticsearch 8.0 + MinIO + Nacos 2.3.0 + Sentinel 1.8.6 + RocketMQ 5.1.0 + Prometheus + Grafana
+# 技术栈：MySQL 8.0 + Redis 7.0 + Elasticsearch 8.0 + MinIO + Nacos 2.3.0 + Sentinel 1.8.6 + RocketMQ 5.1.0 + Kafka 7.4.0 + Prometheus + Grafana
 
 services:
   # ==================== 数据存储层 ====================
@@ -295,10 +295,105 @@ services:
     networks:
       - fnusale-network
 
+  # ==================== 日志收集消息队列 ====================
+
+  # Zookeeper - Kafka依赖
+  # 用途：Kafka集群协调服务
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: fnusale-zookeeper
+    restart: unless-stopped
+    ports:
+      - "${ZOOKEEPER_PORT:-2181}:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    networks:
+      - fnusale-network
+
+  # Kafka - 日志收集消息队列
+  # 用途：收集微服务日志，解耦日志生产与消费
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: fnusale-kafka
+    restart: unless-stopped
+    ports:
+      - "${KAFKA_PORT:-9092}:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    depends_on:
+      - zookeeper
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 768M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - fnusale-network
+
+  # Kafka UI - Kafka管理界面
+  # 用途：可视化管理和监控Kafka，查看Topic、消息、消费者组等
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: fnusale-kafka-ui
+    restart: unless-stopped
+    ports:
+      - "${KAFKA_UI_PORT:-9000}:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: fnusale-kafka
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9093
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    depends_on:
+      - kafka
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    networks:
+      - fnusale-network
+
   # ==================== 监控层 ====================
 
   # Logstash 8.0.0 - 日志收集与处理
-  # 用途：收集微服务日志，处理后写入 Elasticsearch
+  # 用途：从Kafka消费微服务日志，处理后写入 Elasticsearch
   logstash:
     image: docker.elastic.co/logstash/logstash:8.0.0
     container_name: fnusale-logstash
@@ -313,6 +408,8 @@ services:
       - logstash_data:/usr/share/logstash/data
     depends_on:
       elasticsearch:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9600/_node/stats || exit 1"]
@@ -590,3 +687,12 @@ volumes:
   # Alertmanager数据卷
   alertmanager_data:
     name: fnusale-alertmanager-data
+  # Zookeeper数据卷
+  zookeeper_data:
+    name: fnusale-zookeeper-data
+  # Zookeeper日志卷
+  zookeeper_logs:
+    name: fnusale-zookeeper-logs
+  # Kafka数据卷
+  kafka_data:
+    name: fnusale-kafka-data

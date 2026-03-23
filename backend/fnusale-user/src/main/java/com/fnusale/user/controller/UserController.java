@@ -138,15 +138,6 @@ public class UserController {
         return Result.success("更新成功", null);
     }
 
-    @Operation(summary = "校验定位是否在校园内", description = "校验用户当前定位是否在校园围栏内")
-    @GetMapping("/location/verify")
-    public Result<Boolean> verifyLocation(
-            @Parameter(description = "经度", required = true) @RequestParam String longitude,
-            @Parameter(description = "纬度", required = true) @RequestParam String latitude) {
-        boolean result = userService.verifyLocation(longitude, latitude);
-        return Result.success(result);
-    }
-
     @Operation(summary = "获取我的发布列表", description = "获取当前用户发布的商品列表")
     @GetMapping("/my/products")
     public Result<PageResult<Object>> getMyProducts(

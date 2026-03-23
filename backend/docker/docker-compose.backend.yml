@@ -1,0 +1,71 @@
+# FNUSALE 后端服务部署配置
+version: '3.8'
+
+services:
+  # API网关
+  fnusale-gateway:
+    image: openjdk:21-jdk-slim
+    container_name: fnusale-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - NACOS_HOST=111.230.60.71
+      - NACOS_PORT=8848
+      - REDIS_HOST=111.230.60.71
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=redis123456
+      - MYSQL_HOST=111.230.60.71
+      - MYSQL_PORT=3306
+      - SENTINEL_DASHBOARD=111.230.60.71:8858
+      - JAVA_OPTS=-Xms128m -Xmx256m
+    volumes:
+      - ./fnusale-gateway-1.0.0.jar:/app.jar
+    command: java $JAVA_OPTS -jar /app.jar
+    networks:
+      - fnusale-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 用户服务
+  fnusale-user:
+    image: openjdk:21-jdk-slim
+    container_name: fnusale-user
+    restart: unless-stopped
+    ports:
+      - "8101:8101"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - NACOS_HOST=111.230.60.71
+      - NACOS_PORT=8848
+      - NACOS_USERNAME=nacos
+      - NACOS_PASSWORD=nacos
+      - REDIS_HOST=111.230.60.71
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=redis123456
+      - MYSQL_HOST=111.230.60.71
+      - MYSQL_PORT=3306
+      - MYSQL_USER=fnusale
+      - MYSQL_PASSWORD=fnusale123456
+      - MYSQL_DATABASE=fnusale
+      - SENTINEL_DASHBOARD=111.230.60.71:8858
+      - ROCKETMQ_NAME_SERVER=111.230.60.71:9876
+      - JAVA_OPTS=-Xms128m -Xmx256m
+    volumes:
+      - ./fnusale-user-1.0.0.jar:/app.jar
+    command: java $JAVA_OPTS -jar /app.jar
+    networks:
+      - fnusale-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8101/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  fnusale-network:
+    external: true

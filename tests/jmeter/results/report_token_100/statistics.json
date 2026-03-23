@@ -1,0 +1,34 @@
+{
+  "Total" : {
+    "transaction" : "Total",
+    "sampleCount" : 100,
+    "errorCount" : 100,
+    "errorPct" : 100.0,
+    "meanResTime" : 296.37999999999994,
+    "medianResTime" : 165.0,
+    "minResTime" : 112.0,
+    "maxResTime" : 991.0,
+    "pct1ResTime" : 734.3000000000001,
+    "pct2ResTime" : 884.1499999999999,
+    "pct3ResTime" : 990.6499999999999,
+    "throughput" : 19.960079840319363,
+    "receivedKBytesPerSec" : 5.243419411177645,
+    "sentKBytesPerSec" : 8.788087886726547
+  },
+  "参与秒杀" : {
+    "transaction" : "参与秒杀",
+    "sampleCount" : 100,
+    "errorCount" : 100,
+    "errorPct" : 100.0,
+    "meanResTime" : 296.37999999999994,
+    "medianResTime" : 165.0,
+    "minResTime" : 112.0,
+    "maxResTime" : 991.0,
+    "pct1ResTime" : 734.3000000000001,
+    "pct2ResTime" : 884.1499999999999,
+    "pct3ResTime" : 990.6499999999999,
+    "throughput" : 19.960079840319363,
+    "receivedKBytesPerSec" : 5.243419411177645,
+    "sentKBytesPerSec" : 8.788087886726547
+  }
+}

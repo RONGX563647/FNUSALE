@@ -3,13 +3,16 @@ package com.fnusale.marketing.client;
 import com.fnusale.common.common.Result;
 import com.fnusale.common.dto.trade.OrderCreateDTO;
 import com.fnusale.common.vo.trade.OrderVO;
+import com.fnusale.marketing.client.fallback.OrderClientFallbackFactory;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
 /**
  * 订单服务 Feign 客户端
+ * 配置降级处理，提高服务容错性
  */
-@FeignClient(name = "fnusale-trade", path = "/order")
+@FeignClient(name = "fnusale-trade", path = "/order",
+             fallbackFactory = OrderClientFallbackFactory.class)
 public interface OrderClient {
 
     /**

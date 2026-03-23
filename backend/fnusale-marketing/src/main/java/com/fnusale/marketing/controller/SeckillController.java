@@ -15,6 +15,7 @@ import com.fnusale.marketing.service.SeckillService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -58,14 +59,36 @@ public class SeckillController {
         return Result.success(product);
     }
 
+    @Operation(summary = "检查是否需要验证码", description = "检查用户是否需要验证码才能参与秒杀")
+    @GetMapping("/{activityId}/need-captcha")
+    public Result<Boolean> needCaptcha(
+            @Parameter(description = "活动ID") @PathVariable Long activityId) {
+        Long userId = UserContext.getUserIdOrThrow();
+        boolean need = seckillService.needCaptcha(userId, activityId);
+        return Result.success(need);
+    }
+
+    @Operation(summary = "获取验证码", description = "获取秒杀验证码")
+    @GetMapping("/{activityId}/captcha")
+    public Result<String> generateCaptcha(
+            @Parameter(description = "活动ID") @PathVariable Long activityId) {
+        Long userId = UserContext.getUserIdOrThrow();
+        String captchaKey = seckillService.generateCaptcha(userId, activityId);
+        return Result.success("验证码已生成", captchaKey);
+    }
+
     @Operation(summary = "参与秒杀", description = "参与秒杀抢购")
     @PostMapping("/{activityId}/join")
     @SentinelResource(value = "joinSeckill", blockHandler = "handleJoinSeckillBlock", blockHandlerClass = SeckillBlockHandler.class)
     public Result<Long> joinSeckill(
-            @Parameter(description = "活动ID") @PathVariable Long activityId) {
+            @Parameter(description = "活动ID") @PathVariable Long activityId,
+            @Parameter(description = "验证码key") @RequestParam(required = false) String captchaKey,
+            @Parameter(description = "验证码") @RequestParam(required = false) String captchaCode,
+            HttpServletRequest request) {
         Long userId = UserContext.getUserIdOrThrow();
-        Long orderId = seckillService.joinSeckill(userId, activityId);
-        return Result.success("秒杀请求已提交", orderId);
+        String ip = getClientIp(request);
+        Long queueNumber = seckillService.joinSeckill(userId, activityId, ip, captchaKey, captchaCode);
+        return Result.success("秒杀请求已提交", queueNumber);
     }
 
     @Operation(summary = "获取秒杀结果", description = "查询秒杀抢购结果")
@@ -148,5 +171,22 @@ public class SeckillController {
         Long userId = UserContext.getUserIdOrThrow();
         seckillService.cancelReminder(userId, activityId);
         return Result.success("取消成功", null);
+    }
+    
+    /**
+     * 获取客户端真实IP
+     */
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("X-Real-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 }

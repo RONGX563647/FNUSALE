@@ -32,10 +32,10 @@ spring:
           min-idle: 2
           max-wait: 3000ms
     mail:
-      host: smtp.163.com
+      host: smtp.yeah.net
       port: 465
-      username: ${MAIL_USERNAME:lrx563647@yeah.net}
-      password: ${MAIL_PASSWORD:YEUdHnDgEtJNBLQd}
+      username: ${MAIL_USERNAME:}
+      password: ${MAIL_PASSWORD:}
       protocol: smtps
       default-encoding: UTF-8
       send:

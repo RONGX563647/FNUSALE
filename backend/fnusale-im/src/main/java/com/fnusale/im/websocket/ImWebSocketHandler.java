@@ -1,6 +1,8 @@
 package com.fnusale.im.websocket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fnusale.common.log.LogConstants;
+import com.fnusale.common.log.TraceContext;
 import com.fnusale.common.util.JwtUtil;
 import com.fnusale.common.util.UserContext;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * IM WebSocket处理器
+ * 企业级优化：添加TraceId支持，便于日志追踪
  */
 @Slf4j
 @Component
@@ -26,20 +29,42 @@ public class ImWebSocketHandler extends TextWebSocketHandler {
     private final ObjectMapper objectMapper;
     private final OnlineUserManager onlineUserManager;
 
-    // 存储会话：sessionId -> WebSocketSession
     private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+        String traceId = (String) session.getAttributes().get("traceId");
+        String clientIp = (String) session.getAttributes().get("clientIp");
+
+        if (TraceContext.isValidTraceId(traceId)) {
+            TraceContext.init(traceId);
+        } else {
+            TraceContext.init();
+        }
+        if (clientIp != null) {
+            TraceContext.setClientIp(clientIp);
+        }
+
         String sessionId = session.getId();
         sessions.put(sessionId, session);
-        log.info("WebSocket连接建立，sessionId: {}", sessionId);
+
+        log.info("[{}] WebSocket连接建立，sessionId: {}, clientIp: {}",
+                TraceContext.getTraceId(), sessionId, clientIp);
+
+        TraceContext.clear();
     }
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
+        String traceId = (String) session.getAttributes().get("traceId");
+        if (TraceContext.isValidTraceId(traceId)) {
+            TraceContext.init(traceId);
+        } else {
+            TraceContext.init();
+        }
+
         String payload = message.getPayload();
-        log.debug("收到WebSocket消息: {}", payload);
+        log.debug("[{}] 收到WebSocket消息: {}", TraceContext.getTraceId(), payload);
 
         try {
             Map<String, Object> msgMap = objectMapper.readValue(payload, Map.class);
@@ -53,37 +78,55 @@ public class ImWebSocketHandler extends TextWebSocketHandler {
                     handleAuth(session, msgMap);
                     break;
                 default:
-                    log.warn("未知的消息类型: {}", type);
+                    log.warn("[{}] 未知的消息类型: {}", TraceContext.getTraceId(), type);
             }
         } catch (Exception e) {
-            log.error("处理WebSocket消息失败", e);
+            log.error("[{}] 处理WebSocket消息失败", TraceContext.getTraceId(), e);
             sendMessage(session, Map.of("type", "error", "message", "消息处理失败"));
+        } finally {
+            TraceContext.clear();
         }
     }
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
+        String traceId = (String) session.getAttributes().get("traceId");
+        if (TraceContext.isValidTraceId(traceId)) {
+            TraceContext.init(traceId);
+        } else {
+            TraceContext.init();
+        }
+
         String sessionId = session.getId();
         sessions.remove(sessionId);
 
-        // 移除在线用户
         Long userId = (Long) session.getAttributes().get("userId");
         if (userId != null) {
             onlineUserManager.removeOnlineUser(userId);
-            log.info("用户下线，userId: {}", userId);
+            log.info("[{}] 用户下线，userId: {}", TraceContext.getTraceId(), userId);
         }
 
-        log.info("WebSocket连接关闭，sessionId: {}, status: {}", sessionId, status);
+        log.info("[{}] WebSocket连接关闭，sessionId: {}, status: {}",
+                TraceContext.getTraceId(), sessionId, status);
+
+        TraceContext.clear();
     }
 
     @Override
     public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
-        log.error("WebSocket传输错误，sessionId: {}", session.getId(), exception);
+        String traceId = (String) session.getAttributes().get("traceId");
+        if (TraceContext.isValidTraceId(traceId)) {
+            TraceContext.init(traceId);
+        } else {
+            TraceContext.init();
+        }
+
+        log.error("[{}] WebSocket传输错误，sessionId: {}",
+                TraceContext.getTraceId(), session.getId(), exception);
+
+        TraceContext.clear();
     }
 
-    /**
-     * 处理心跳消息
-     */
     private void handlePing(WebSocketSession session) throws IOException {
         Long userId = (Long) session.getAttributes().get("userId");
         if (userId != null) {
@@ -92,9 +135,6 @@ public class ImWebSocketHandler extends TextWebSocketHandler {
         sendMessage(session, Map.of("type", "pong", "timestamp", System.currentTimeMillis()));
     }
 
-    /**
-     * 处理认证消息
-     */
     private void handleAuth(WebSocketSession session, Map<String, Object> msgMap) throws IOException {
         String token = (String) msgMap.get("token");
         if (token == null || token.isEmpty()) {
@@ -102,12 +142,10 @@ public class ImWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        // 去掉Bearer前缀
         if (token.startsWith("Bearer ")) {
             token = token.substring(7);
         }
 
-        // 验证token
         if (!JwtUtil.validateToken(token)) {
             sendMessage(session, Map.of("type", "auth_result", "success", false, "message", "token无效或已过期"));
             return;
@@ -119,40 +157,35 @@ public class ImWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        // 保存在线状态
         session.getAttributes().put("userId", userId);
         onlineUserManager.addOnlineUser(userId, session.getId());
 
-        log.info("WebSocket认证成功，userId: {}", userId);
+        TraceContext.setUserId(userId);
+
+        log.info("[{}] WebSocket认证成功，userId: {}", TraceContext.getTraceId(), userId);
         sendMessage(session, Map.of("type", "auth_result", "success", true, "message", "认证成功"));
     }
 
-    /**
-     * 发送消息给指定用户
-     */
     public void sendMessageToUser(Long userId, Map<String, Object> message) {
         String wsSessionId = onlineUserManager.getSessionId(userId);
         if (wsSessionId == null) {
-            log.debug("用户不在线，userId: {}", userId);
+            log.debug("[{}] 用户不在线，userId: {}", TraceContext.getTraceId(), userId);
             return;
         }
 
         WebSocketSession session = sessions.get(wsSessionId);
         if (session == null || !session.isOpen()) {
-            log.debug("WebSocket会话不存在或已关闭，userId: {}", userId);
+            log.debug("[{}] WebSocket会话不存在或已关闭，userId: {}", TraceContext.getTraceId(), userId);
             return;
         }
 
         try {
             sendMessage(session, message);
         } catch (IOException e) {
-            log.error("发送消息失败，userId: {}", userId, e);
+            log.error("[{}] 发送消息失败，userId: {}", TraceContext.getTraceId(), userId, e);
         }
     }
 
-    /**
-     * 发送消息
-     */
     private void sendMessage(WebSocketSession session, Map<String, Object> message) throws IOException {
         if (session.isOpen()) {
             String json = objectMapper.writeValueAsString(message);

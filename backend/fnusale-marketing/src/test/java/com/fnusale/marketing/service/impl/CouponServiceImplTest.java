@@ -1,7 +1,5 @@
 package com.fnusale.marketing.service.impl;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fnusale.common.constant.MarketingConstants;
 import com.fnusale.common.dto.marketing.CouponDTO;
 import com.fnusale.common.entity.Coupon;
@@ -11,6 +9,7 @@ import com.fnusale.common.vo.marketing.CouponVO;
 import com.fnusale.common.vo.marketing.UserCouponVO;
 import com.fnusale.marketing.mapper.CouponMapper;
 import com.fnusale.marketing.mapper.UserCouponMapper;
+import com.fnusale.marketing.service.MarketingEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -19,6 +18,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.SetOperations;
+import org.springframework.data.redis.core.ValueOperations;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -28,10 +30,12 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
- * 优惠券服务单元测试
+ * 优惠券服务单元测试（v4优化：匹配异步实现）
  */
 @ExtendWith(MockitoExtension.class)
 class CouponServiceImplTest {
@@ -41,6 +45,18 @@ class CouponServiceImplTest {
 
     @Mock
     private UserCouponMapper userCouponMapper;
+
+    @Mock
+    private MarketingEventPublisher eventPublisher;
+
+    @Mock
+    private StringRedisTemplate redisTemplate;
+
+    @Mock
+    private SetOperations<String, String> setOperations;
+
+    @Mock
+    private ValueOperations<String, String> valueOperations;
 
     @InjectMocks
     private CouponServiceImpl couponService;
@@ -73,6 +89,9 @@ class CouponServiceImplTest {
         testCouponDTO.setTotalCount(100);
         testCouponDTO.setStartTime(LocalDateTime.now().plusDays(1));
         testCouponDTO.setEndTime(LocalDateTime.now().plusDays(30));
+
+        lenient().when(redisTemplate.opsForSet()).thenReturn(setOperations);
+        lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
     }
 
     @Nested
@@ -139,14 +158,15 @@ class CouponServiceImplTest {
         @DisplayName("成功领取优惠券")
         void shouldReceiveCouponSuccessfully() {
             when(couponMapper.selectById(1L)).thenReturn(testCoupon);
+            when(setOperations.isMember(anyString(), eq("1"))).thenReturn(false);
             when(userCouponMapper.countByUserAndCoupon(1L, 1L)).thenReturn(0);
-            when(couponMapper.incrementReceivedCount(1L)).thenReturn(1);
-            when(userCouponMapper.insert(any(UserCoupon.class))).thenReturn(1);
+            when(valueOperations.get(anyString())).thenReturn("10");
+            when(valueOperations.decrement(anyString())).thenReturn(9L);
+            doNothing().when(eventPublisher).publishCouponReceiveEvent(any());
 
             assertDoesNotThrow(() -> couponService.receiveCoupon(1L, 1L));
 
-            verify(couponMapper).incrementReceivedCount(1L);
-            verify(userCouponMapper).insert(any(UserCoupon.class));
+            verify(eventPublisher).publishCouponReceiveEvent(any());
         }
 
         @Test
@@ -204,7 +224,7 @@ class CouponServiceImplTest {
         @DisplayName("已领取过的优惠券抛出异常")
         void shouldThrowExceptionWhenAlreadyReceived() {
             when(couponMapper.selectById(1L)).thenReturn(testCoupon);
-            when(userCouponMapper.countByUserAndCoupon(1L, 1L)).thenReturn(1);
+            when(setOperations.isMember(anyString(), eq("1"))).thenReturn(true);
 
             BusinessException exception = assertThrows(BusinessException.class,
                     () -> couponService.receiveCoupon(1L, 1L));
@@ -217,8 +237,9 @@ class CouponServiceImplTest {
         @DisplayName("优惠券库存不足时抛出异常")
         void shouldThrowExceptionWhenCouponOutOfStock() {
             when(couponMapper.selectById(1L)).thenReturn(testCoupon);
+            when(setOperations.isMember(anyString(), eq("1"))).thenReturn(false);
             when(userCouponMapper.countByUserAndCoupon(1L, 1L)).thenReturn(0);
-            when(couponMapper.incrementReceivedCount(1L)).thenReturn(0);
+            when(valueOperations.get(anyString())).thenReturn("0");
 
             BusinessException exception = assertThrows(BusinessException.class,
                     () -> couponService.receiveCoupon(1L, 1L));
@@ -523,28 +544,6 @@ class CouponServiceImplTest {
     }
 
     @Nested
-    @DisplayName("分页查询优惠券测试")
-    class GetCouponPageTests {
-
-        @Test
-        @DisplayName("成功分页查询优惠券")
-        void shouldReturnCouponPage() {
-            Page<Coupon> page = new Page<>(1, 10);
-            page.setRecords(List.of(testCoupon));
-            page.setTotal(1);
-
-            when(couponMapper.selectCouponPage(any(Page.class), isNull(), isNull(), isNull()))
-                    .thenReturn(page);
-
-            IPage<CouponVO> result = couponService.getCouponPage(null, null, null, 1, 10);
-
-            assertNotNull(result);
-            assertEquals(1, result.getRecords().size());
-            assertEquals(1, result.getTotal());
-        }
-    }
-
-    @Nested
     @DisplayName("发放优惠券测试")
     class GrantCouponTests {
 
@@ -552,13 +551,11 @@ class CouponServiceImplTest {
         @DisplayName("成功发放优惠券给多个用户")
         void shouldGrantCouponToUsers() {
             when(couponMapper.selectById(1L)).thenReturn(testCoupon);
-            when(userCouponMapper.countByUserAndCoupon(anyLong(), anyLong())).thenReturn(0);
-            when(couponMapper.incrementReceivedCount(1L)).thenReturn(1);
-            when(userCouponMapper.insert(any(UserCoupon.class))).thenReturn(1);
+            doNothing().when(eventPublisher).publishCouponGrantBatch(any());
 
             assertDoesNotThrow(() -> couponService.grantCoupon(1L, List.of(1L, 2L, 3L)));
 
-            verify(userCouponMapper, times(3)).insert(any(UserCoupon.class));
+            verify(eventPublisher, times(1)).publishCouponGrantBatch(any());
         }
 
         @Test
@@ -582,20 +579,6 @@ class CouponServiceImplTest {
                     () -> couponService.grantCoupon(1L, List.of(1L)));
 
             assertEquals(4006, exception.getCode());
-        }
-
-        @Test
-        @DisplayName("用户已领取过则跳过")
-        void shouldSkipUserWhoAlreadyReceived() {
-            when(couponMapper.selectById(1L)).thenReturn(testCoupon);
-            when(userCouponMapper.countByUserAndCoupon(1L, 1L)).thenReturn(1);
-            when(userCouponMapper.countByUserAndCoupon(2L, 1L)).thenReturn(0);
-            when(couponMapper.incrementReceivedCount(1L)).thenReturn(1);
-            when(userCouponMapper.insert(any(UserCoupon.class))).thenReturn(1);
-
-            couponService.grantCoupon(1L, List.of(1L, 2L));
-
-            verify(userCouponMapper, times(1)).insert(any(UserCoupon.class));
         }
     }
 }

@@ -46,4 +46,16 @@ public interface MarketingClient {
     Result<Void> useCoupon(
             @PathVariable("userCouponId") Long userCouponId,
             @RequestParam("orderId") Long orderId);
+
+    /**
+     * 扣减秒杀活动库存（数据库）
+     */
+    @PostMapping("/inner/seckill/{activityId}/deduct-stock")
+    Result<Boolean> deductSeckillStock(@PathVariable("activityId") Long activityId);
+    
+    /**
+     * 重置本地消息状态为待重试（消费者处理失败时调用）
+     */
+    @PostMapping("/inner/seckill/message/{messageId}/reset")
+    Result<Void> resetMessageStatus(@PathVariable("messageId") String messageId);
 }
