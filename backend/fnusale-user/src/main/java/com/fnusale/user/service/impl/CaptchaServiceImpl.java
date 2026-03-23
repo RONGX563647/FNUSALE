@@ -10,7 +10,7 @@ import com.fnusale.common.enums.AuthStatus;
 import com.fnusale.common.enums.ResultCode;
 import com.fnusale.common.event.UserRegisterEvent;
 import com.fnusale.common.exception.BusinessException;
-import com.fnusale.common.util.DesensitizeUtil;
+import cn.hutool.core.util.DesensitizedUtil;
 import com.fnusale.common.util.JwtUtil;
 import com.fnusale.common.vo.user.LoginVO;
 import com.fnusale.common.vo.user.UserVO;
@@ -104,10 +104,10 @@ public class CaptchaServiceImpl implements CaptchaService {
         if (account.contains("@")) {
             // 邮箱地址，发送邮件验证码
             emailService.sendVerificationCode(account, captcha);
-            log.info("验证码邮件发送成功 - 邮箱：{}", DesensitizeUtil.email(account));
+            log.info("验证码邮件发送成功 - 邮箱：{}", DesensitizedUtil.email(account));
         } else {
             // 手机号，发送短信验证码（待集成短信服务）
-            log.info("短信验证码已生成 - 手机号：{}, 验证码：{}", DesensitizeUtil.phone(account), captcha);
+            log.info("短信验证码已生成 - 手机号：{}, 验证码：{}", DesensitizedUtil.mobilePhone(account), captcha);
             // TODO: 集成短信服务（阿里云 SMS / 腾讯云 SMS）
         }
     }

@@ -1,14 +1,13 @@
 package com.fnusale.user.mq.consumer;
 
+import cn.hutool.core.util.DesensitizedUtil;
 import com.fnusale.common.constant.RocketMQConstants;
 import com.fnusale.common.event.UserRegisterEvent;
-import com.fnusale.common.util.DesensitizeUtil;
 import com.fnusale.user.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
 import org.apache.rocketmq.spring.core.RocketMQListener;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -25,7 +24,6 @@ import java.util.concurrent.TimeUnit;
         selectorExpression = RocketMQConstants.USER_REGISTER_TAG_WELCOME
 )
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "rocketmq.name-server")
 public class UserRegisterWelcomeConsumer implements RocketMQListener<UserRegisterEvent> {
 
     private final StringRedisTemplate redisTemplate;
@@ -52,10 +50,7 @@ public class UserRegisterWelcomeConsumer implements RocketMQListener<UserRegiste
         }
 
         try {
-            // TODO: 调用 IM 服务发送欢迎消息
-            // 目前先记录日志，后续可以集成 IM 服务或邮件/短信服务
             sendWelcomeNotification(event);
-
             log.info("欢迎通知发送成功, userId: {}", userId);
         } catch (Exception e) {
             // 处理失败，删除幂等性 Key，允许重试
@@ -73,33 +68,19 @@ public class UserRegisterWelcomeConsumer implements RocketMQListener<UserRegiste
         if (event.getEmail() != null && !event.getEmail().isEmpty()) {
             try {
                 emailService.sendWelcomeEmail(event.getEmail(), event.getUsername());
-                log.info("欢迎邮件发送成功 - email: {}", DesensitizeUtil.email(event.getEmail()));
+                log.info("欢迎邮件发送成功 - email: {}", DesensitizedUtil.email(event.getEmail()));
             } catch (Exception e) {
-                log.error("欢迎邮件发送失败 - email: {}, 错误: {}", 
-                    DesensitizeUtil.email(event.getEmail()), e.getMessage(), e);
+                log.error("欢迎邮件发送失败 - email: {}, 错误: {}",
+                    DesensitizedUtil.email(event.getEmail()), e.getMessage(), e);
             }
         }
 
         // TODO: 后续集成短信服务
         if (event.getPhone() != null && !event.getPhone().isEmpty()) {
-            log.info("欢迎短信发送（待集成） - phone: {}", DesensitizeUtil.phone(event.getPhone()));
+            log.info("欢迎短信发送（待集成） - phone: {}", DesensitizedUtil.mobilePhone(event.getPhone()));
         }
 
         // TODO: 后续集成 IM 服务
         log.info("欢迎站内消息发送（待集成） - userId: {}", event.getUserId());
-    }
-
-    /**
-     * 手机号脱敏（使用 DesensitizeUtil）
-     */
-    private String maskPhone(String phone) {
-        return DesensitizeUtil.phone(phone);
-    }
-
-    /**
-     * 邮箱脱敏（使用 DesensitizeUtil）
-     */
-    private String maskEmail(String email) {
-        return DesensitizeUtil.email(email);
     }
 }

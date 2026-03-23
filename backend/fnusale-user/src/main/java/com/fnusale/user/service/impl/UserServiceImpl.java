@@ -13,11 +13,12 @@ import com.fnusale.common.enums.AuthStatus;
 import com.fnusale.common.event.UserRegisterEvent;
 import com.fnusale.common.exception.BusinessException;
 import com.fnusale.common.common.PageResult;
-import com.fnusale.common.util.DesensitizeUtil;
+import cn.hutool.core.lang.Validator;
+import cn.hutool.core.util.DesensitizedUtil;
+import cn.hutool.core.util.StrUtil;
 import com.fnusale.common.util.GeoFenceUtil;
 import com.fnusale.common.util.JwtUtil;
 import com.fnusale.common.util.UserContext;
-import com.fnusale.common.util.UserValidator;
 import com.fnusale.common.vo.user.LoginVO;
 import com.fnusale.common.vo.user.UserVO;
 import com.fnusale.user.mapper.UserMapper;
@@ -44,7 +45,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.function Runnable;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -68,9 +68,9 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void registerByPhone(UserRegisterDTO dto) {
-        UserValidator.validatePhone(dto.getPhone());
-        UserValidator.validateUsername(dto.getUsername());
-        UserValidator.validatePassword(dto.getPassword());
+        validatePhone(dto.getPhone());
+        validateUsername(dto.getUsername());
+        validatePassword(dto.getPassword());
 
         executeWithLock(
             RedisKeyConstants.buildRegisterLockKey(dto.getPhone()),
@@ -84,7 +84,7 @@ public class UserServiceImpl implements UserService {
                 userMapper.insert(user);
                 initUserPoints(user.getId());
                 publishRegisterEvent(user, "PHONE");
-                log.info("用户注册成功，userId: {}, phone: {}", user.getId(), DesensitizeUtil.phone(dto.getPhone()));
+                log.info("用户注册成功，userId: {}, phone: {}", user.getId(), DesensitizedUtil.mobilePhone(dto.getPhone()));
             }
         );
     }
@@ -92,9 +92,9 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void registerByEmail(UserRegisterDTO dto) {
-        UserValidator.validateEmail(dto.getEmail());
-        UserValidator.validateUsername(dto.getUsername());
-        UserValidator.validatePassword(dto.getPassword());
+        validateEmail(dto.getEmail());
+        validateUsername(dto.getUsername());
+        validatePassword(dto.getPassword());
 
         executeWithLock(
             RedisKeyConstants.buildRegisterLockKey(dto.getEmail()),
@@ -108,7 +108,7 @@ public class UserServiceImpl implements UserService {
                 userMapper.insert(user);
                 initUserPoints(user.getId());
                 publishRegisterEvent(user, "EMAIL");
-                log.info("用户注册成功，userId: {}, email: {}", user.getId(), DesensitizeUtil.email(dto.getEmail()));
+                log.info("用户注册成功，userId: {}, email: {}", user.getId(), DesensitizedUtil.email(dto.getEmail()));
             }
         );
     }
@@ -252,7 +252,7 @@ public class UserServiceImpl implements UserService {
         user.setId(userId);
 
         if (dto.getUsername() != null && !dto.getUsername().isEmpty()) {
-            UserValidator.validateUsername(dto.getUsername());
+            validateUsername(dto.getUsername());
             user.setUsername(dto.getUsername());
         }
 
@@ -293,7 +293,7 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException("原密码错误");
         }
 
-        UserValidator.validatePassword(newPassword);
+        validatePassword(newPassword);
 
         User updateUser = User.builder()
                 .id(userId)
@@ -357,7 +357,7 @@ public class UserServiceImpl implements UserService {
                 evictUserCache(userId);
 
                 log.info("用户提交身份认证，userId: {}, studentTeacherId: {}", userId,
-                        DesensitizeUtil.studentTeacherId(dto.getStudentTeacherId()));
+                        maskStudentTeacherId(dto.getStudentTeacherId()));
             } finally {
                 if (lock.isHeldByCurrentThread()) {
                     lock.unlock();
@@ -391,7 +391,7 @@ public class UserServiceImpl implements UserService {
     public void updateLocationPermission(String permission) {
         Long userId = UserContext.getUserIdOrThrow();
 
-        UserValidator.validateLocationPermission(permission);
+        validateLocationPermission(permission);
 
         User user = User.builder()
                 .id(userId)
@@ -515,15 +515,26 @@ public class UserServiceImpl implements UserService {
         UserVO vo = new UserVO();
         BeanUtils.copyProperties(user, vo);
         if (user.getStudentTeacherId() != null) {
-            vo.setStudentTeacherId(DesensitizeUtil.studentTeacherId(user.getStudentTeacherId()));
+            vo.setStudentTeacherId(maskStudentTeacherId(user.getStudentTeacherId()));
         }
         if (user.getPhone() != null) {
-            vo.setPhone(DesensitizeUtil.phone(user.getPhone()));
+            vo.setPhone(DesensitizedUtil.mobilePhone(user.getPhone()));
         }
         if (user.getCampusEmail() != null) {
-            vo.setCampusEmail(DesensitizeUtil.email(user.getCampusEmail()));
+            vo.setCampusEmail(DesensitizedUtil.email(user.getCampusEmail()));
         }
         return vo;
+    }
+
+    /**
+     * 学号/工号脱敏
+     * 2021001001 -> ****0001
+     */
+    private String maskStudentTeacherId(String id) {
+        if (id == null || id.length() <= 4) {
+            return id;
+        }
+        return StrUtil.hide(id, 0, id.length() - 4);
     }
 
     /**
@@ -569,5 +580,53 @@ public class UserServiceImpl implements UserService {
                 .creditScore(UserConstants.DEFAULT_CREDIT_SCORE)
                 .locationPermission(UserConstants.LOCATION_PERMISSION_DENY)
                 .build();
+    }
+
+    // ========== 验证方法（使用 Hutool Validator）==========
+
+    private void validatePhone(String phone) {
+        if (StrUtil.isBlank(phone)) {
+            throw new BusinessException("手机号不能为空");
+        }
+        if (!Validator.isMobile(phone)) {
+            throw new BusinessException("手机号格式不正确");
+        }
+    }
+
+    private void validateEmail(String email) {
+        if (StrUtil.isBlank(email)) {
+            throw new BusinessException("邮箱不能为空");
+        }
+        if (!Validator.isEmail(email)) {
+            throw new BusinessException("邮箱格式不正确");
+        }
+    }
+
+    private void validateUsername(String username) {
+        if (StrUtil.isBlank(username)) {
+            return;
+        }
+        int length = username.length();
+        if (length < UserConstants.USERNAME_MIN_LENGTH || length > UserConstants.USERNAME_MAX_LENGTH) {
+            throw new BusinessException("用户名长度应在" + UserConstants.USERNAME_MIN_LENGTH + "-" +
+                UserConstants.USERNAME_MAX_LENGTH + "个字符之间");
+        }
+    }
+
+    private void validatePassword(String password) {
+        if (StrUtil.isBlank(password)) {
+            return;
+        }
+        int length = password.length();
+        if (length < UserConstants.PASSWORD_MIN_LENGTH || length > UserConstants.PASSWORD_MAX_LENGTH) {
+            throw new BusinessException("密码长度应在" + UserConstants.PASSWORD_MIN_LENGTH + "-" +
+                UserConstants.PASSWORD_MAX_LENGTH + "位之间");
+        }
+    }
+
+    private void validateLocationPermission(String permission) {
+        if (!"ALLOW".equals(permission) && !"DENY".equals(permission)) {
+            throw new BusinessException("定位权限状态不正确");
+        }
     }
 }

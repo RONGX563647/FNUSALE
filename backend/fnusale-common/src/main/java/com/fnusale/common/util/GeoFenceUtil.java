@@ -7,10 +7,13 @@ import java.util.List;
 
 /**
  * 地理围栏工具类
- * 使用射线法判断点是否在多边形内
+ * 提供多边形判断和距离计算功能
  */
 @Slf4j
 public class GeoFenceUtil {
+
+    private GeoFenceUtil() {
+    }
 
     /**
      * 判断点是否在多边形内（射线法）
@@ -29,9 +32,6 @@ public class GeoFenceUtil {
         int n = polygon.size();
         boolean inside = false;
 
-        double lon = longitude;
-        double lat = latitude;
-
         int j = n - 1;
         for (int i = 0; i < n; i++) {
             double xi = polygon.get(i).getLongitude();
@@ -40,8 +40,8 @@ public class GeoFenceUtil {
             double yj = polygon.get(j).getLatitude();
 
             // 射线法核心逻辑
-            boolean intersect = ((yi > lat) != (yj > lat))
-                    && (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+            boolean intersect = ((yi > latitude) != (yj > latitude))
+                    && (longitude < (xj - xi) * (latitude - yi) / (yj - yi) + xi);
 
             if (intersect) {
                 inside = !inside;
@@ -57,10 +57,10 @@ public class GeoFenceUtil {
      * 判断点是否在圆形区域内
      *
      * @param longitude  经度
-     * @param latitude  纬度
-     * @param centerLon 圆心经度
-     * @param centerLat 圆心纬度
-     * @param radius    半径（米）
+     * @param latitude   纬度
+     * @param centerLon  圆心经度
+     * @param centerLat  圆心纬度
+     * @param radius     半径（米）
      * @return 是否在圆形区域内
      */
     public static boolean isPointInCircle(double longitude, double latitude,
@@ -93,41 +93,6 @@ public class GeoFenceUtil {
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
         return R * c;
-    }
-
-    /**
-     * 计算点到线段的最短距离
-     *
-     * @param pointLon   点经度
-     * @param pointLat   点纬度
-     * @param segmentLon1 线段起点经度
-     * @param segmentLat1 线段起点纬度
-     * @param segmentLon2 线段终点经度
-     * @param segmentLat2 线段终点纬度
-     * @return 最短距离（米）
-     */
-    public static double pointToSegmentDistance(double pointLon, double pointLat,
-                                                double segmentLon1, double segmentLat1,
-                                                double segmentLon2, double segmentLat2) {
-        double distance1 = haversineDistance(pointLat, pointLon, segmentLat1, segmentLon1);
-        double distance2 = haversineDistance(pointLat, pointLon, segmentLat2, segmentLon2);
-
-        double segmentLength = haversineDistance(segmentLat1, segmentLon1, segmentLat2, segmentLon2);
-
-        if (segmentLength == 0) {
-            return distance1;
-        }
-
-        // 计算投影点比例
-        double t = Math.max(0, Math.min(1,
-                ((pointLon - segmentLon1) * (segmentLon2 - segmentLon1)
-                        + (pointLat - segmentLat1) * (segmentLat2 - segmentLat1))
-                        / (segmentLength * segmentLength)));
-
-        double projectionLat = segmentLat1 + t * (segmentLat2 - segmentLat1);
-        double projectionLon = segmentLon1 + t * (segmentLon2 - segmentLon1);
-
-        return haversineDistance(pointLat, pointLon, projectionLat, projectionLon);
     }
 
     /**
